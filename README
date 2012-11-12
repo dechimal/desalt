@@ -1,0 +1,67 @@
+Desalt - C++11 Utility Libraries
+
+Desalt ease using some metaprogramming idiom on C++11.
+
+Library includes following features:
+
+- AutoFun : Deduce a return type of function by the body.
+- Require : Conditional overloaded function selection using SFINAE.
+- ParameterPack : Assisting metaprogramming with parameter pack.
+
+
+AutoFun
+
+  Header
+  desalt/auto_fun.hpp
+
+  Synopsis
+  DESALT_AUTO_FUN(name_sig, expr) /* unspecified */
+  DESALT_AUTO_FUN_NOEXCEPT(name_sig, expr) /* unspecified */
+
+  DESALT_AUTO_FUN define a function what has a name and a signature by name_sig.
+  The return type is decltype(expr).
+
+  Parameters
+  name_sig | A name and signature of function.
+           | grammer is:
+           |   name_sig:
+           |     declarator-id ( parameter-declaration-clause )
+           |       cv-qualifier_opt ref-qualifier_opt exception-specification_opt
+  expr     | A expression to be body of the function and to determine the return type.
+           | expr can include some number comma.
+ 
+  Semantics
+  A declaration
+    DESALT_AUTO_FUN( name_sig , expr ) ;
+  generates following function definition:
+    auto name_sig -> decltype( expr )
+      { return expr ; }
+  cv-qualifier, ref-qualifier, and exception-specification are optional.
+
+  DESALT_AUTO_FUN_NOEXCEPT(name_sig, expr) is same DESALT_AUTO_FUN(name_sig, expr) except exception-specification is determined by noexcept(expression).
+
+  Example
+  See test/auto_fun.cpp
+
+Require
+
+  Header
+  desalt/require.hpp
+
+  Synopsis
+  DESALT_REQUIRE(mpl_cond) /* unspecified */
+  DESALT_REQUIRE_NOT(mpl_cond) /* unspecified */
+  DESALT_REQUIRE_C(cond) /* unspecified */
+  DESALT_REQUIRE_EXPR(expr) /* unspecified */
+
+  Parameters
+  mpl_cond | A model of Boost.MPL Integral Constant.
+  cond     | A integral-constant-expression.
+
+  Semantics
+
+
+ParameterPack
+
+  Header
+  desalt/parameter_pack.hpp
