@@ -4,9 +4,12 @@ Desalt ease using some metaprogramming idiom on C++11.
 
 Library includes following features:
 
-- AutoFun : Deduce a return type of function by the body.
+- AutoFun : Deduce return type of a function by the body at the definition.
 - Require : Conditional overloaded function selection using SFINAE.
-- ParameterPack : Assisting metaprogramming with parameter pack.
+- ParameterPack : Assist metaprogramming with parameter pack.
+- Newtype : Make a different type with existing type easily (inspired by Haskell's newtype),
+
+The samples are under test/ directory.
 
 
 AutoFun
@@ -15,8 +18,8 @@ AutoFun
   desalt/auto_fun.hpp
 
   Synopsis
-  DESALT_AUTO_FUN(name_sig, expr) /* unspecified */
-  DESALT_AUTO_FUN_NOEXCEPT(name_sig, expr) /* unspecified */
+  #define DESALT_AUTO_FUN(name_sig, expr) /* unspecified */
+  #define DESALT_AUTO_FUN_NOEXCEPT(name_sig, expr) /* unspecified */
 
   DESALT_AUTO_FUN define a function what has a name and a signature by name_sig.
   The return type is decltype(expr).
@@ -49,10 +52,10 @@ Require
   desalt/require.hpp
 
   Synopsis
-  DESALT_REQUIRE(mpl_cond) /* unspecified */
-  DESALT_REQUIRE_NOT(mpl_cond) /* unspecified */
-  DESALT_REQUIRE_C(cond) /* unspecified */
-  DESALT_REQUIRE_EXPR(expr) /* unspecified */
+  #define DESALT_REQUIRE(mpl_cond) /* unspecified */
+  #define DESALT_REQUIRE_NOT(mpl_cond) /* unspecified */
+  #define DESALT_REQUIRE_C(cond) /* unspecified */
+  #define DESALT_REQUIRE_EXPR(expr) /* unspecified */
 
   Parameters
   mpl_cond | A model of Boost.MPL Integral Constant.
@@ -65,3 +68,8 @@ ParameterPack
 
   Header
   desalt/parameter_pack.hpp
+
+Newtype
+
+  Header
+  desalt/newtype.hpp
