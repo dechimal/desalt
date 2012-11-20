@@ -1,4 +1,3 @@
-
 #include <type_traits>
 #include <desalt/require.hpp>
 
