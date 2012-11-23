@@ -264,8 +264,6 @@ struct base_wrapper : T {
     using T::T;
 };
 
-enum class overload_resolution_barrier { value };
-
 }}
 
 #endif
