@@ -43,8 +43,6 @@ template<typename T>
 DESALT_NEWTYPE(darray, (std::vector<T>),
     unwrap,
     this,
-    begin,
-    end,
     typename value_type,
     new (
         void my_push_back(value_type const & x) {
@@ -52,7 +50,40 @@ DESALT_NEWTYPE(darray, (std::vector<T>),
             this->push_back(x);
         }
     ),
-    explicit (push_back)(int);
+    new (
+        DESALT_NEWTYPE(iterator, (typename std::vector<T>::iterator),
+            base,
+            friend class darray,
+            this,
+            operator*,
+            operator++,
+            operator--,
+            operator->,
+            namespace operator!=,
+            operator+=,
+            operator-=,
+            namespace operator+,
+            namespace operator-,
+            operator[],
+            namespace operator<,
+            namespace operator>,
+            namespace operator<=,
+            namespace operator>=,
+            value_type,
+            difference_type,
+            pointer,
+            reference,
+            iterator_category
+        );
+    ),
+    new (
+        using const_iterator = iterator const;
+        iterator begin() { return iterator(std::vector<T>::begin()); }
+        iterator end() { return iterator(std::vector<T>::end()); }
+        const_iterator begin() const { return iterator(std::vector<T>::begin()); }
+        const_iterator end() const { return iterator(std::vector<T>::end()); }
+    ),
+    explicit (insert)(iterator, T const &)
 );
 
 // template<typename T>
@@ -62,13 +93,21 @@ DESALT_NEWTYPE(darray, (std::vector<T>),
 //     std::vector<T> & unwrap();
 //     std::vector<T> const & unwrap() const;
 //     using std::vector<T>::vector;
-//     using std::vector<T>::begin;
-//     using std::vector<T>::end;
 //     using typename std::vector<T>::value_type;
 //     void my_push_back(value_type const & x) {
 //         this->push_back(x);
 //         this->push_back(x);
 //     }
+//     struct iterator : private std::vector<T>::iterator {
+//         // (snip)
+//     };
+//     using std::vector<T>::begin;
+//     using std::vector<T>::end;
+//     using const_iterator = iterator const;
+//     iterator begin() { return iterator(std::vector<T>::begin()); }
+//     iterator end() { return iterator(std::vector<T>::end()); }
+//     const_iterator begin() const { return iterator(std::vector<T>::begin()); }
+//     const_iterator end() const { return iterator(std::vector<T>::end()); }
 // };
 
 template<typename T>
@@ -102,6 +141,18 @@ int main() {
     {
         darray<int> d{1,2,3};
         d.my_push_back(4);
+        d.insert(d.begin(), 5);
+        auto i = d.begin();
+        static_assert(!std::is_same<decltype(i), std::vector<int>::iterator>::value, "");
+        std::cout << *i << '\n';
+        std::cout << *i.base() << '\n';
+        ++i;
+        std::cout << *i << '\n';
+        i += 3;
+        std::cout << *i << '\n';
+        std::cout << *(i - 1) << '\n';
+        auto d2 = d;
+        // d.insert(d2.begin(), d2.end());
         for (auto i : d) {
             ::print_line(i);
         }
