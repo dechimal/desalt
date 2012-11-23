@@ -81,6 +81,17 @@
                            std::forward<Args>(args)...))); \
     }
 
+// explicit
+#define DESALT_NEWTYPE_KW_explicit ,
+#define DESALT_NEWTYPE_GET_MACRO_explicit DESALT_NEWTYPE_WITH_ARGUMENT,
+#define DESALT_NEWTYPE_WITH_ARGUMENT(f_sig, name, base) \
+    DESALT_NEWTYPE_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_NAME() name_sig, BOOST_PP_TUPLE_EAT() name_sig, name, bas)
+#define DESALT_NEWTYPE_WITH_ARGUMENT_I(f, sig, name, base) \
+    DESALT_NEWTPYE_WITH_ARGUMENT_II(f, BOOST_PP_VARIADIC_SIZE sig, sig, name, base)
+#define DESALT_NEWTYPE_WITH_ARGUMENT(f, arity, sig, name, base) \
+    DESALT_AUTO_FUN(f(DESALT_NEWTYPE_WITH_ARGUMENT_GEN_PARAM_LIST(sig)), \
+                    this->base_wrapper::f(DESALT_NEWTYPE_WITH_ARGUMENT_GEN_FORWARD_LIST(sig));
+
 // namespace
 #define DESALT_NEWTYPE_KW_namespace ,
 #define DESALT_NEWTYPE_GET_MACRO_namespace DESALT_NEWTYPE_NONMEMBER,
@@ -135,7 +146,7 @@
 #define DESALT_NEWTYPE_F_E_KW_operator ,
 #define DESALT_NEWTYPE_F_E_GET_MACRO_operator DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT,
 #define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT(op_sig, name, base) \
-    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_OP() op_sig, BOOST_PP_TUPLE_EAT() op_sig, name, base)
+    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_NAME() op_sig, BOOST_PP_TUPLE_EAT() op_sig, name, base)
 #define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_I(op, sig, name, base) \
     DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_II(op, BOOST_PP_TUPLE_REM() (boost::mpl::vector<BOOST_PP_TUPLE_REM() sig>), name, base)
 #define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_II(op, vec, name, base) \
@@ -163,9 +174,9 @@
             BOOST_PP_TUPLE_REM() op desalt::newtype::wrapper_access::unwrap<name, base>(r); \
     }
 
-#define DESALT_NEWTYPE_GET_OP() \
-    DESALT_NEWTYPE_GET_OP_I
-#define DESALT_NEWTYPE_GET_OP_I(op) \
+#define DESALT_NEWTYPE_GET_NAME() \
+    DESALT_NEWTYPE_GET_NAME_I
+#define DESALT_NEWTYPE_GET_NAME_I(op) \
     (op) BOOST_PP_TUPLE_EAT()
 
 
@@ -234,6 +245,8 @@ template<typename T>
 struct base_wrapper : T {
     using T::T;
 };
+
+enum class overload_resolution_barrier { value };
 
 }}
 

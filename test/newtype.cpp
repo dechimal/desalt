@@ -51,7 +51,8 @@ DESALT_NEWTYPE(darray, (std::vector<T>),
             this->push_back(x);
             this->push_back(x);
         }
-    )
+    ),
+    explicit (push_back)(int);
 );
 
 // template<typename T>
