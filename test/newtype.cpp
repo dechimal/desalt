@@ -21,7 +21,7 @@ DESALT_NEWTYPE(ivector, (std::vector<int>),
 //     using std::vector<int>::end;
 // };
 
-DESALT_NEWTYPE(mystring, (std::string),
+DESALT_NEWTYPE(mystring, std::string,
     std_string,
     this,
     auto append,
