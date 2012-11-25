@@ -70,6 +70,7 @@
 #define DESALT_NEWTYPE_USING_TYPENAME(typename_, wrapped, base) \
     using base::typename_;
 
+// auto
 #define DESALT_NEWTYPE_KW_auto ,
 #define DESALT_NEWTYPE_GET_MACRO_auto DESALT_NEWTYPE_WRAPPED,
 #define DESALT_NEWTYPE_WRAPPED(member, wrapped, base) \
@@ -95,9 +96,9 @@
 #define DESALT_NEWTYPE_KW_explicit ,
 #define DESALT_NEWTYPE_GET_MACRO_explicit DESALT_NEWTYPE_WITH_ARGUMENT,
 #define DESALT_NEWTYPE_WITH_ARGUMENT(member_sig, wrapped, base) \
-    DESALT_NEWTYPE_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_NAME() member_sig, BOOST_PP_TUPLE_EAT() member_sig, wrapped, base)
-#define DESALT_NEWTYPE_WITH_ARGUMENT_I(member, sig, wrapped, base) \
-    DESALT_NEWTYPE_WITH_ARGUMENT_II(member, DESALT_NEWTYPE_WITH_ARGUMENT_GEN_PARAM_LIST(sig), DESALT_NEWTYPE_WITH_ARGUMENT_GEN_FORWARD_LIST(sig), BOOST_PP_TUPLE_EAT() sig, wrapped, base)
+    DESALT_NEWTYPE_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_NAME(member_sig), DESALT_NEWTYPE_GET_SIG(member_sig), DESALT_NEWTYPE_GET_QUALIFIERS(member_sig), wrapped, base)
+#define DESALT_NEWTYPE_WITH_ARGUMENT_I(member, sig, qualifiers, wrapped, base) \
+    DESALT_NEWTYPE_WITH_ARGUMENT_II(BOOST_PP_TUPLE_REM() member, DESALT_NEWTYPE_WITH_ARGUMENT_GEN_PARAM_LIST(sig), DESALT_NEWTYPE_WITH_ARGUMENT_GEN_FORWARD_LIST(sig), qualifiers, wrapped, base)
 #define DESALT_NEWTYPE_WITH_ARGUMENT_II(member, params, forwards, qualifiers, wrapped, base) \
     DESALT_AUTO_FUN(member(params) qualifiers, this->desalt::newtype::base_wrapper<base>::member(forwards));
 
@@ -148,9 +149,47 @@
 #define DESALT_NEWTYPE_NS_KW_explicit ,
 #define DESALT_NEWTYPE_NS_GET_MACRO_explicit DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT,
 #define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT(f_sig, wrapped, base) \
-    DESALT_PP_DISPATCH(DESALT_NEWTYPE_NS_E_KW_, DESALT_NEWTYPE_NS_E_GET_MACRO_, DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_II, f_sig)(DESALT_PP_DISPATCH_GET_ARG(DESALT_NEWTYPE_NS_E_KW_, f_sig), wrapped, base)
+    DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_I(DESALT_NEWTYPE_GET_NAME(f_sig), DESALT_NEWTYPE_GET_SIG(f_sig), DESALT_NEWTYPE_GET_QUALIFIERS(f_sig), wrapped, base)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_I(f, sig, qualifiers, wrapped, base) \
+    DESALT_PP_DISPATCH(DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_KW_, \
+                       DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GET_MACRO_, \
+                       DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_FUNCTION, BOOST_PP_TUPLE_REM() f) \
+        (DESALT_PP_DISPATCH_GET_ARG(DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_KW_, BOOST_PP_TUPLE_REM() f), sig, qualifiers, wrapped, base)
 
-// #define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_II(f, sig, wrapped, base)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_KW_operator ,
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GET_MACRO_operator DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_OPERATOR,
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_OPERATOR(op, sig, qualifiers, wrapped, base) \
+    DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_OPERATOR_I( \
+        BOOST_PP_TUPLE_REM() (op), \
+        DESALT_NEWTYPE_WITH_ARGUMENT_GEN_PARAM_LIST(sig), \
+        qualifiers, \
+        BOOST_PP_TUPLE_REM() BOOST_PP_IIF(BOOST_PP_DEC(BOOST_PP_VARIADIC_SIZE sig), \
+                                          (desalt::newtype::wrapper_access::unwrap<wrapped, base>(a0) op desalt::newtype::wrapper_access::unwrap<wrapped, base>(a1)), \
+                                          (op desalt::newtype::wrapper_access::unwrap<wrapped, base>(a0))), \
+        wrapped, \
+        base)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_OPERATOR_I(op, params, qualifiers, expr, wrapped, base) \
+    friend DESALT_AUTO_FUN(operator op(params) qualifiers, desalt::newtype::wrapper_access::wrap<wrapped, base>(expr));
+
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_FUNCTION(f, sig, wrapped, base) \
+    DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_FUNCTION_I( \
+        BOOST_PP_TUPLE_REM() f, \
+        DESALT_NEWTYPE_WITH_ARGUMENT_GEN_PARAM_LIST(sig), \
+        DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST(sig, wrapped, base), \
+        BOOST_PP_TUPLE_EAT() sig, \
+        wrapped, \
+        base)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_FUNCTION_I(f, params, forwards, qualifiers, wrapped, base) \
+    friend DESALT_AUTO_FUN(f(params) qualifiers, f(forwards));
+
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST(sig, wrapped, base) \
+    BOOST_PP_SEQ_FOR_EACH_I(DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M, (wrapped, base), BOOST_PP_TUPLE_TO_SEQ(sig))
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M(r, d, i) \
+    DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M_I(BOOST_PP_TUPLE_REM() d, i)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M_I(d, i) \
+    DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M_II(d, i)
+#define DESALT_NEWTYPE_NONMEMBER_WITH_ARGUMENT_GEN_FORWARD_LIST_M_II(wrapped, base, i) \
+    BOOST_PP_COMMA_IF(i) desalt::newtype::wrapper_access::unwrap<wrapped, base>(BOOST_PP_CAT(a, i))
 
 // namespace operator (only binary operators)
 #define DESALT_NEWTYPE_NS_KW_operator ,
@@ -165,43 +204,20 @@
                                desalt::newtype::wrapper_access::unwrap<wrapped, base>(l) \
                             op desalt::newtype::wrapper_access::unwrap<wrapped, base>(r)));
 
+#define DESALT_NEWTYPE_GET_NAME(f_sig) \
+    BOOST_PP_TUPLE_ELEM(0, (DESALT_NEWTYPE_GET_NAME_I f_sig))
+#define DESALT_NEWTYPE_GET_NAME_I(...) \
+    (__VA_ARGS__), // f may be "operator,".
 
-// namespace explicit operator (only binary operators)
-#define DESALT_NEWTYPE_NS_E_KW_operator ,
-#define DESALT_NEWTYPE_NS_E_GET_MACRO_operator DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT,
-#define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT(op_sig, wrapped, base) \
-    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_I((DESALT_NEWTYPE_GET_NAME() op_sig), BOOST_PP_TUPLE_EAT() op_sig, wrapped, base)
-#define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_I(op, sig, wrapped, base) \
-    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_II(op, BOOST_PP_TUPLE_REM() (boost::mpl::vector<BOOST_PP_TUPLE_REM() sig>), wrapped, base)
-#define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_II(op, vec, wrapped, base) \
-    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_III( \
-        op, \
-        BOOST_PP_TUPLE_REM() (typename boost::mpl::at_c<vec, 0>::type), \
-        BOOST_PP_TUPLE_REM() (typename boost::mpl::at_c<vec, 1>::type), \
-        wrapped, \
-        base)
-#define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_III(op, ltype, rtype, wrapped, base) \
-    DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_IV( \
-        op, \
-        BOOST_PP_TUPLE_REM() ( \
-            typename desalt::newtype::wrap_if_base< \
-                decltype(std::declval<typename desalt::newtype::unwrap_if_derived<ltype, wrapped, base>::type>() \
-                      BOOST_PP_TUPLE_REM() op std::declval<typename desalt::newtype::unwrap_if_derived<rtype, wrapped, base>::type>()), \
-                wrapped, base>::type), \
-        BOOST_PP_TUPLE_REM() (ltype), \
-        BOOST_PP_TUPLE_REM() (rtype), \
-        wrapped, \
-        base)
-#define DESALT_NEWTYPE_NONMEMBER_OPERATOR_WITH_ARGUMENT_IV(op, restype, ltype, rtype, wrapped, base) \
-    friend restype operator BOOST_PP_TUPLE_REM() op(ltype l, rtype r) { \
-        return desalt::newtype::wrapper_access::unwrap<wrapped, base>(l) \
-            BOOST_PP_TUPLE_REM() op desalt::newtype::wrapper_access::unwrap<wrapped, base>(r); \
-    }
+#define DESALT_NEWTYPE_GET_SIG(f_sig) \
+    BOOST_PP_TUPLE_ELEM(0, (DESALT_NEWTYPE_GET_SIG_I f_sig))
+#define DESALT_NEWTYPE_GET_SIG_I(...) \
+    DESALT_NEWTYPE_GET_SIG_II
+#define DESALT_NEWTYPE_GET_SIG_II(...) \
+    (__VA_ARGS__),
 
-#define DESALT_NEWTYPE_GET_NAME() \
-    DESALT_NEWTYPE_GET_NAME_I
-#define DESALT_NEWTYPE_GET_NAME_I(name) \
-    name BOOST_PP_TUPLE_EAT()
+#define DESALT_NEWTYPE_GET_QUALIFIERS(f_sig) \
+    BOOST_PP_TUPLE_ELEM(1, (DESALT_NEWTYPE_GET_SIG_I f_sig))
 
 
 #define DESALT_NEWTYPE_KW_new ,

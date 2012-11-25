@@ -5,7 +5,7 @@
 
 // Haskellのnewtypeみたいなもの（ある型から，暗黙には元の型から/へは変換できない別の型を作る）
 
-DESALT_NEWTYPE(ivector, (std::vector<int>),
+DESALT_NEWTYPE(ivector, std::vector<int>,
     as_base,
     begin,
     end
@@ -25,7 +25,7 @@ DESALT_NEWTYPE(mystring, std::string,
     std_string,
     this,
     auto append,
-    namespace explicit operator(<<)(std::ostream &, mystring const &)
+    namespace explicit (operator<<)(std::ostream &, mystring const &)
 );
 
 // struct mystring : private std::string {
@@ -40,7 +40,7 @@ DESALT_NEWTYPE(mystring, std::string,
 // ostream & operator <<(std::ostream &, mystring const &);
 
 template<typename T>
-DESALT_NEWTYPE(darray, (std::vector<T>),
+DESALT_NEWTYPE(darray, std::vector<T>,
     unwrap,
     this,
     typename value_type,
@@ -51,7 +51,7 @@ DESALT_NEWTYPE(darray, (std::vector<T>),
         }
     ),
     new (
-        DESALT_NEWTYPE(iterator, (typename std::vector<T>::iterator),
+        DESALT_NEWTYPE(iterator, typename std::vector<T>::iterator,
             base,
             friend class darray,
             this,
