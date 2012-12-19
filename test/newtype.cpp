@@ -110,6 +110,35 @@ DESALT_NEWTYPE(darray, std::vector<T>,
 //     const_iterator end() const { return iterator(std::vector<T>::end()); }
 // };
 
+// Syntax and feature list (*-ed features now supported)
+// DESALT_NEWTYPE(fuga, (hoge<int, int>),         // *new type and underlying type
+//     to_base,                                   // *function getting own reference as underlying type
+//     f,                                         // *using
+//     this,                                      // *inheriting ctor
+//     operator+,                                 // *operator using
+//     (operator,),                               // operator using (for operator,)
+//     explicit (this)(int, int),                 // ctor forwarding with specified signature
+//     explicit (f)(int),                         // *forwarding with specified signature
+//     explicit (operator+)(),                    // unary operator forwarding with specified signature
+//     explicit (operator++)(int),                // unary postfix operator forwarding with specified signature
+//     explicit (operator+)(int),                 // binary operator forwarding with specified signature
+//     auto f,                                    // *auto wrapped forwarding
+//     auto operator+,                            // *auto wrapped operator forwarding
+//     auto (operator,),                          // auto wrapped operator forwarding (for operator,)
+//     namespace explicit (f)(int),               // *non-member function forwarding with specified signature
+//     namespace explicit (operator+)(int),       // *non-member unary operator forwarding with specified signature
+//     namespace explicit (operator++)(int, int), // non-member unary postfix operator forwarding with specified signature
+//     namespace explicit (operator+)(int, int),  // *non-member binary operator forwarding with specified signature
+//     namespace f,                               // auto wrapped non-member function forwarding
+//     namespace operator+,                       // **auto wrapped non-member operator forwarding (** only binary op)
+//     namespace (operator,),                     // auto wrapped non-member operator forwarding (for operator,)
+//     friend f,                                  // *friend function declaration
+//     friend class piyo,                         // *friend class declaration
+//     typename type,                             // *using as typename
+//     new ( void f() {} ),                       // *manual definition
+//                                                // *no operation
+// );
+
 template<typename T>
 void print_line(T const & x) {
     std::cout << x << '\n';
