@@ -226,6 +226,20 @@
     DESALT_PP_TUPLE_REM_IF_PAREN(def) def
 
 /*
+#define DESALT_NEWTYPE_NONMEMBER_I(_, wrapped, base) \
+    template<typename ...Args, \
+             typename BaseRes = \
+                 decltype(f(std::declval<typename desalt::newtype::unwrap_if_derived< \
+                                         Args, wrapped, base>::type>()...)), \
+             typename Res = typename \
+                 desalt::newtype::wrap_if_base< \
+                     BaseRes, wrapped, base>::type> \
+    friend Res f(Args && ...args) { \
+        using desalt::newtype::is_same_unqualified; \
+        static_assert(!boost::mpl::or_<is_same_unqualified<Args, base>...>::value, ""); \
+        return static_cast<Res>(f(std::forward<Args>(args)...)); \
+    }
+
 #define DESALT_NEWTYPE_INTEGRAL(wrapped, base, ...) \
     DESALT_NEWTYPE_INTEGRAL_I(wrapped, BOOST_IDENTITY_TYPE((DESALT_PP_TUPLE_REM_IF_PAREN(base) base)), __VA_ARGS__ \
         BOOST_PP_COMMA_IF(BOOST_PP_NOT(BOOST_PP_DEC(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)))))
