@@ -284,6 +284,8 @@ struct wrapper_access {
 template<typename T>
 struct base_wrapper : T {
     using T::T;
+    base_wrapper(T const & x) : T(x) {}
+    base_wrapper(T && x) : T(std::move(x)) {}
 };
 
 }}
