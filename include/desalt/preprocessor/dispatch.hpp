@@ -7,9 +7,10 @@
 #include <boost/preprocessor/facilities/is_empty.hpp>
 #include <boost/preprocessor/expand.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <desalt/preprocessor/is_keyword.hpp>
 
 #define DESALT_PP_DISPATCH(keyword_pred, get_macro, default_, ...) \
-    BOOST_PP_EXPAND(BOOST_PP_IIF(DESALT_PP_DISPATCH_IS_KEYWORD(keyword_pred, __VA_ARGS__), \
+    BOOST_PP_EXPAND(BOOST_PP_IIF(DESALT_PP_IS_KEYWORD(keyword_pred, __VA_ARGS__), \
                                  DESALT_PP_DISPATCH_GET_MACRO_I, \
                                  default_ BOOST_PP_TUPLE_EAT())(get_macro, __VA_ARGS__))
 #define DESALT_PP_DISPATCH_IS_KEYWORD(keyword_pred, ...) \

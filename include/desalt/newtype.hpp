@@ -225,6 +225,25 @@
 #define DESALT_NEWTYPE_NEW_MEMBER(def, wrapped, base) \
     DESALT_PP_TUPLE_REM_IF_PAREN(def) def
 
+/*
+#define DESALT_NEWTYPE_INTEGRAL(wrapped, base, ...) \
+    DESALT_NEWTYPE_INTEGRAL_I(wrapped, BOOST_IDENTITY_TYPE((DESALT_PP_TUPLE_REM_IF_PAREN(base) base)), __VA_ARGS__ \
+        BOOST_PP_COMMA_IF(BOOST_PP_NOT(BOOST_PP_DEC(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)))))
+#define DESALT_NEWTYPE_INTEGRAL_I(wrapped, base, ...) \
+    DESALT_NEWTYPE_INTEGRAL_II(wrapped, base, __VA_ARGS__)
+#define DESALT_NEWTYPE_INTEGRAL_II(wrapped, base, unwrap, ...) \
+    enum class wrapped : typename remove_enum<base>::type {}; \
+    base unwrap(wrapped) noexcept { return static_cast<base>(name); } \
+    BOOST_PP_SEQ_FOR_EACH(DESALT_NEWTYPE_INTEGRAL_M, (wrapped, base), BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+#define DESALT_NEWTYPE_INTEGRAL_M(r, d, op) \
+    DESALT_NEWTYPE_INTEGRAL_M_I(e, BOOST_TUPLE_REM() d)
+#define DESALT_NEWTYPE_INTEGRAL_M_I(op, d) \
+    BOOST_PP_IIF(DESALT_PP_IS_EMPTY(e), \
+                 BOOST_PP_TUPLE_EAT(), \
+                 DESALT_NEWTYPE_INTEGRAL_NONMEMBER_FUNCTION)(op, d)
+#define DESALT_NEWTYPE_INTEGRAL_NONMEMBER_FUNCTION(op, wrapped, base)
+*/
+
 namespace desalt { namespace newtype {
 namespace mpl = boost::mpl;
 
