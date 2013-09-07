@@ -291,11 +291,15 @@ struct unwrap_if_derived
 
 struct wrapper_access {
     template<typename Derived, typename Base, typename T>
-    static typename wrap_if_base<T&&, Derived, Base>::type wrap(T && t) {
-        return typename wrap_if_base<T&&, Derived, Base>::type(std::forward<T>(t));
+    static typename wrap_if_base<T &, Derived, Base>::type wrap(T & t) {
+        return typename wrap_if_base<T &, Derived, Base>::type(t);
     }
     template<typename Derived, typename Base, typename T>
-    static typename unwrap_if_derived<T&&, Derived, Base>::type unwrap(T && t) {
+    static typename wrap_if_base<T, Derived, Base>::type wrap(T && t) {
+        return typename wrap_if_base<T, Derived, Base>::type(std::move(t));
+    }
+    template<typename Derived, typename Base, typename T>
+    static typename unwrap_if_derived<T &&, Derived, Base>::type unwrap(T && t) {
         return std::forward<T>(t);
     }
 };
