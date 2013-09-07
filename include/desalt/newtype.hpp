@@ -207,7 +207,7 @@
 #define DESALT_NEWTYPE_GET_NAME(f_sig) \
     BOOST_PP_TUPLE_ELEM(0, (DESALT_NEWTYPE_GET_NAME_I f_sig))
 #define DESALT_NEWTYPE_GET_NAME_I(...) \
-    (__VA_ARGS__), // f may be "operator,".
+    (__VA_ARGS__), // __VA_ARGS__ may be "operator,".
 
 #define DESALT_NEWTYPE_GET_SIG(f_sig) \
     BOOST_PP_TUPLE_ELEM(0, (DESALT_NEWTYPE_GET_SIG_I f_sig))

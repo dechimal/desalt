@@ -111,33 +111,35 @@ DESALT_NEWTYPE(darray, std::vector<T>,
 // };
 
 // Syntax and feature list (*-ed features now supported)
-// DESALT_NEWTYPE(fuga, (hoge<int, int>),         // *new type and underlying type
-//     to_base,                                   // *function getting own reference as underlying type
-//     f,                                         // *using
-//     this,                                      // *inheriting ctor
-//     operator+,                                 // *operator using
-//     (operator,),                               // operator using (for operator,)
-//     explicit (this)(int, int),                 // ctor forwarding with specified signature
-//     explicit (f)(int),                         // *forwarding with specified signature
-//     explicit (operator+)(),                    // unary operator forwarding with specified signature
-//     explicit (operator++)(int),                // unary postfix operator forwarding with specified signature
-//     explicit (operator+)(int),                 // binary operator forwarding with specified signature
-//     auto f,                                    // *auto wrapped forwarding
-//     auto operator+,                            // *auto wrapped operator forwarding
-//     auto (operator,),                          // auto wrapped operator forwarding (for operator,)
-//     namespace explicit (f)(int),               // *non-member function forwarding with specified signature
-//     namespace explicit (operator+)(int),       // *non-member unary operator forwarding with specified signature
-//     namespace explicit (operator++)(int, int), // non-member unary postfix operator forwarding with specified signature
-//     namespace explicit (operator+)(int, int),  // *non-member binary operator forwarding with specified signature
-//     namespace f,                               // auto wrapped non-member function forwarding
-//     namespace operator+,                       // **auto wrapped non-member operator forwarding (** only binary op)
-//     namespace (operator,),                     // auto wrapped non-member operator forwarding (for operator,)
-//     friend f,                                  // *friend function declaration
-//     friend class piyo,                         // *friend class declaration
-//     typename type,                             // *using as typename
-//     new ( void f() {} ),                       // *manual definition
-//                                                // *no operation
+// DESALT_NEWTYPE(fuga, (hoge<int, int>),                // *new type and underlying type
+//     to_base,                                          // *function getting own reference as underlying type
+//     f,                                                // *using
+//     this,                                             // *inheriting ctor
+//     operator@,                                        // *operator using
+//     friend f,                                         // *friend function declaration
+//     friend class piyo,                                // *friend class declaration
+//     typename type,                                    // *using as typename
+//     new ( void f() {} ),                              // *manual definition
+//                                                       // *no operation
 // );
+// TODO:
+// (*-ed features are implementing now)
+//     (operator,),                                      // operator using (for operator,)
+//     auto f,                                           // *auto wrapped forwarding
+//     auto operator@,                                   // *auto wrapped operator forwarding
+//     auto (operator,),                                 // auto wrapped operator forwarding (for operator,)
+//     explicit (type)(this)(type, type),                // ctor forwarding with specified signature
+//     explicit (type)(f)(type),                         // *forwarding with specified signature
+//     explicit (type)(operator@)(),                     // unary operator forwarding with specified signature
+//     explicit (type)(operator@)(type),                 // unary postfix operator forwarding with specified signature
+//     explicit (type)(operator@)(type),                 // binary operator forwarding with specified signature
+//     namespace f,                                      // auto wrapped non-member function forwarding
+//     namespace operator@,                              // *auto wrapped non-member operator forwarding
+//     namespace (operator,),                            // auto wrapped non-member operator forwarding (for operator,)
+//     namespace explicit (type)(f)(type),               // *non-member function forwarding with specified signature
+//     namespace explicit (type)(operator@)(type),       // *non-member unary operator forwarding with specified signature
+//     namespace explicit (type)(operator@)(type, type), // non-member unary postfix operator forwarding with specified signature
+//     namespace explicit (type)(operator@)(type, type), // *non-member binary operator forwarding with specified signature
 
 template<typename T>
 void print_line(T const & x) {
