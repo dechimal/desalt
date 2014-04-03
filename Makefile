@@ -5,13 +5,13 @@ HEADERDIR := $(ROOT)/include
 -include config.mk
 
 ifeq ($(findstring clang,$(CXX)),clang)
-CXX11FLAGS := -std=c++11
+CXX1YFLAGS := -std=c++1y
 else
 ifeq ($(findstring g++,$(CXX)),g++)
-CXX11FLAGS := -std=gnu++11
+CXX1YFLAGS := -std=gnu++1y
 endif
 endif
-CXXFLAGS += -Werror -Wall -Wextra -pedantic-errors -std=gnu++11
+CXXFLAGS += -Werror -Wall -Wextra -pedantic-errors $(CXX1YFLAGS)
 CPPFLAGS += -I$(HEADERDIR) -I.
 ifneq ($(BOOST_INCLUDE),)
 CPPFLAGS += -I$(BOOST_INCLUDE)
