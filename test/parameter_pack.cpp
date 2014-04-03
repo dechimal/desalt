@@ -33,5 +33,8 @@ STATIC_TEST(std::is_same<ppack::enumerate_c<int, 0, 5>::type, type_seq<std::inte
                                                                        std::integral_constant<int, 2>,
                                                                        std::integral_constant<int, 3>,
                                                                        std::integral_constant<int, 4>>>::value);
+STATIC_TEST(std::is_same<ppack::at_c<a, 0>::type, int>::value);
+STATIC_TEST(std::is_same<ppack::at_c<a, 1>::type, char>::value);
+STATIC_TEST(std::is_same<ppack::at_c<a, 2>::type, double>::value);
 
 int main() {}

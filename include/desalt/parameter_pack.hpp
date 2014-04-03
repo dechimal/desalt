@@ -35,6 +35,8 @@ template<typename Seq, typename E> struct push;
 template<typename First, typename Last> struct enumerate;
 template<typename T, T First, T Last> struct enumerate_c;
 template<typename T, T Last, T I, T ...Is> struct enumerate_impl;
+template<typename Seq, typename N> struct at;
+template<typename Seq, std::size_t N> struct at_c;
 
 template<typename T, typename ...Ts>
 struct head<type_seq<T, Ts...>> {
@@ -108,6 +110,15 @@ template<typename T, T Last, T ...Is> struct enumerate_impl<T, Last, Last, Is...
 template<typename T, T Last, T I, T ...Is> struct enumerate_impl
     : enumerate_impl<T, Last, I + 1, Is..., I>
 {};
+template<typename Seq, typename N> struct at
+    : at_c<Seq, N::value>
+{};
+template<typename T, typename ...Ts, std::size_t N> struct at_c<type_seq<T, Ts...>, N>
+    : at_c<type_seq<Ts...>, N - 1>
+{};
+template<typename T, typename ...Ts> struct at_c<type_seq<T, Ts...>, 0> {
+    using type = T;
+};
 
 }
 
@@ -122,6 +133,8 @@ using aux::from_mpl_seq;
 using aux::from_fusion_seq;
 using aux::enumerate;
 using aux::enumerate_c;
+using aux::at;
+using aux::at_c;
 
 }}
 
