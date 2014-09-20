@@ -1,7 +1,7 @@
 
 .PHONY: test clean
 
-targets := require auto_fun parameter_pack newtype while struct
+targets := require auto_fun parameter_pack newtype while struct format
 LDFLAGS += -lstdc++
 CXXFLAGS += -g -O0
 

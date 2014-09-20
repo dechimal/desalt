@@ -1,6 +1,6 @@
-Desalt - C++11 Utility Libraries
+Desalt - C++14 Utility Libraries
 
-Desalt ease using some metaprogramming idiom on C++11.
+Desalt ease using some metaprogramming idiom on C++14.
 
 Library includes following features:
 
@@ -73,3 +73,7 @@ Newtype
 
   Header
   desalt/newtype.hpp
+
+Format
+  Header
+  desalt/format.hpp
