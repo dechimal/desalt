@@ -17,7 +17,21 @@
 #include <desalt/format/constexpr/array.hpp>
 #include <desalt/format/detail/toi.hpp>
 #include <desalt/format/detail/find_placeholder.hpp>
-#include <desalt/format/detail/default_formatter.hpp>
+
+namespace desalt { namespace format { namespace traits {
+
+template<char const *, std::size_t I, std::size_t, typename T, typename = void>
+struct argument_formatter {
+    static constexpr std::size_t end_pos = I;
+    static constexpr std::size_t used_indexes_count = 0;
+    template<typename U, typename ...Args>
+    static void format(std::ostream & ost, U const & val, Args const & ...) {
+        ost << val;
+    }
+};
+
+}}}
+
 #include <desalt/format/detail/numeric_formatter.hpp>
 
 #define DESALT_FORMAT_STRING(...) DESALT_FORMAT(string, __VA_ARGS__)
@@ -125,7 +139,7 @@ struct text {
 // placeholder
 template<char const * String, std::size_t I, std::size_t E, typename T, std::size_t PlaceholderIndex>
 struct placeholder {
-    using argument_formatter_type = decltype(traits::argument_formatter<String, I, E>(std::declval<T>()));
+    using argument_formatter_type = traits::argument_formatter<String, I, E, T>;
     static constexpr std::size_t end_pos = argument_formatter_type::end_pos;
     static constexpr std::size_t used_indexes_count = argument_formatter_type::used_indexes_count;
     template<typename ...Args>

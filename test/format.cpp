@@ -11,6 +11,7 @@ struct a {};
 template<typename CharT>
 std::basic_ostream<CharT> & operator<<(std::basic_ostream<CharT> & ost, a) {
     ost << "It works!";
+    return ost;
 }
 
 template<typename ...Args>
@@ -19,6 +20,29 @@ auto printf(char const * format, Args ...args) {
     std::snprintf(buf, 128, format, args...);
     return std::string(buf);
 }
+
+struct my_int {
+    int a;
+};
+
+namespace desalt { namespace format { namespace traits {
+
+template<char const * String, std::size_t I, std::size_t E>
+struct argument_formatter<String, I, E, my_int> {
+    static_assert(E - I >= 4, "");
+    static_assert(*(String + I + 0) == 'h', "");
+    static_assert(*(String + I + 1) == 'o', "");
+    static_assert(*(String + I + 2) == 'g', "");
+    static_assert(*(String + I + 3) == 'e', "");
+    static constexpr std::size_t end_pos = I + 4;
+    static constexpr std::size_t used_indexes_count = 0;
+    template<typename ...Args>
+    static void format(std::ostream & ost, my_int i, Args const & ...) {
+        ost << i.a * 2;
+    }
+};
+
+}}}
 
 #define TEST(format, ...) ATTOTEST_ASSERT_EQUAL(::printf(format, __VA_ARGS__), DESALT_FORMAT_STRING(format, __VA_ARGS__))
 
@@ -50,4 +74,5 @@ ATTOTEST_CASE(format_test) {
     TEST("%1$7.3u", 42, 24);
     TEST("%2$7.3u", 42, 24);
     ATTOTEST_ASSERT_EQUAL(DESALT_FORMAT_STRING("%d %d", a{}, 42), "It works!d 42");
+    ATTOTEST_ASSERT_EQUAL(DESALT_FORMAT_STRING("%hoge", my_int{42}), "84");
 }

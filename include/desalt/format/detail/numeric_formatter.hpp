@@ -152,9 +152,14 @@ struct integer_formatter {
 
 namespace traits {
 
-template<char const * String, std::size_t I, std::size_t E, typename T,
-         DESALT_REQUIRE_C(std::is_integral<T>::value)>
-detail::integer_formatter<String, I, E, T> argument_formatter(T);
+template<char const * String, std::size_t I, std::size_t E, typename T>
+struct argument_formatter<String, I, E, T, typename std::enable_if<std::is_integral<T>::value>::type> : detail::integer_formatter<String, I, E, T>
+{
+    using base = detail::integer_formatter<String, I, E, T>;
+    using base::end_pos;
+    using base::used_indexes_count;
+    using base::format;
+};
 
 }
 
