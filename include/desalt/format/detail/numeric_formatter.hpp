@@ -58,10 +58,10 @@ struct integer_formatter {
     static constexpr std::size_t end_pos = type_end;
     static constexpr std::size_t used_indexes_count = has_width + has_precision;
     using this_type = integer_formatter;
-    template<typename CharT, typename ...Args>
-    static void format(std::basic_ostream<CharT> & ost, T const & val, Args const & ...) {
+    template<typename OStream, typename ...Args>
+    static void format(OStream & ost, T const & val, Args const & ...) {
         constexpr unsigned upper_bound_size = 1 + prefix_size + here::max(precision, width, integer_formatter::upper_bound_size(sizeof(val)*8, base));
-        std::array<CharT, upper_bound_size + 1> buf;
+        std::array<typename OStream::char_type, upper_bound_size + 1> buf;
         buf.back() = '\0';
         auto f = buf.rbegin() + 1;
         auto precision_pos = f + precision;

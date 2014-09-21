@@ -8,7 +8,7 @@ namespace here = detail;
 
 template<typename T, std::size_t N>
 struct array {
-    static constexpr std::size_t size() {
+    constexpr std::size_t size() const {
         return N;
     }
     using t = T const [N];
@@ -17,6 +17,22 @@ struct array {
     }
     T a[N];
 };
+
+template<typename T>
+struct array<T, 0> {
+    constexpr std::size_t size() const {
+        return 0;
+    }
+};
+
+template<typename T, typename ...Args>
+array<T, sizeof...(Args)> make_array(Args ...args) {
+    return {{args...}};
+}
+template<typename T, typename ...Args>
+array<T, 0> make_array() {
+    return {};
+}
 
 }}}
 

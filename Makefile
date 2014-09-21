@@ -11,7 +11,7 @@ ifeq ($(findstring g++,$(CXX)),g++)
 CXX1YFLAGS := -std=gnu++1y
 endif
 endif
-CXXFLAGS += -Werror -Wall -Wextra -Wno-parentheses $(CXX1YFLAGS)
+CXXFLAGS += -Werror -Wall -Wextra -pedantic-errors -Wno-parentheses $(CXX1YFLAGS)
 CPPFLAGS += -I$(HEADERDIR) -I.
 ifneq ($(BOOST_INCLUDE),)
 CPPFLAGS += -I$(BOOST_INCLUDE)

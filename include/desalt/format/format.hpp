@@ -24,8 +24,8 @@ template<char const *, std::size_t I, std::size_t, typename T, typename = void>
 struct argument_formatter {
     static constexpr std::size_t end_pos = I;
     static constexpr std::size_t used_indexes_count = 0;
-    template<typename U, typename ...Args>
-    static void format(std::ostream & ost, U const & val, Args const & ...) {
+    template<typename OStream, typename U, typename ...Args>
+    static void format(OStream & ost, U const & val, Args const & ...) {
         ost << val;
     }
 };
@@ -41,8 +41,7 @@ struct argument_formatter {
 #define DESALT_FORMAT(f, ...) DESALT_FORMAT_I(f, __VA_ARGS__ BOOST_PP_COMMA_IF(BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 1)))
 #define DESALT_FORMAT_I(...) DESALT_FORMAT_II(__VA_ARGS__)
 #define DESALT_FORMAT_II(f, str, ...) \
-    ([&] { struct t { using type = desalt::format::detail::to_str<std::integer_sequence<char, BOOST_PP_ENUM(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, str)>>; }; \
-           return desalt::format::detail::make_formatter<t>::f(__VA_ARGS__); }())
+    (desalt::format::detail::make_formatter<desalt::format::detail::to_str<std::integer_sequence<char, BOOST_PP_ENUM(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, str)>>>::f(__VA_ARGS__))
 #define DESALT_FORMAT_M(z, i, format) \
     (i < sizeof(format) ? format[i] : '\0')
 
@@ -86,16 +85,16 @@ auto parse_format_string() {
 template<typename T>
 struct make_formatter {
     template<typename ...Args>
-    using formatter = decltype(here::parse_format_string<T::type::str, 0, here::find(T::type::str, T::type::str + sizeof(T::type::str), '\0') - T::type::str, type_seq<Args...>, 0>());
+    using formatter = decltype(here::parse_format_string<T::str, 0, here::find(T::str, T::str + sizeof(T::str), '\0') - T::str, type_seq<Args...>, 0>());
     template<typename ...Args>
     static std::string string(Args const & ...args) {
         std::stringstream ss;
         formatter<Args...>().write(ss, args...);
         return ss.str();
     }
-    template<typename ...Args>
+    template<typename OStream, typename ...Args>
     static auto format(Args const & ...args) {
-        return here::make_ostream_adaptor([&] (std::ostream & ost) {
+        return here::make_ostream_adaptor([&] (OStream & ost) {
                 formatter<Args...>().write(ost, args...);
             });
     }
@@ -108,32 +107,38 @@ struct make_formatter {
 // ostream_adaptor
 template<typename F> struct ostream_adaptor { F f; };
 template<typename F> ostream_adaptor<F> make_ostream_adaptor(F f) { return ostream_adaptor<F>(f); }
-template<typename F>
-std::ostream & operator<<(std::ostream & ost, ostream_adaptor<F> adaptor) {
+template<typename OStream, typename F>
+OStream & operator<<(OStream & ost, ostream_adaptor<F> adaptor) {
     adaptor.f(ost);
     return ost;
 }
 
 // unescape
-template<char const * String, std::size_t I, std::size_t E, char ...Chars,
+template<char const * String, std::size_t I, std::size_t E, typename CharT, char ...Chars,
          DESALT_REQUIRE_C(I == E)>
 auto unescape(type_seq<std::integral_constant<char, Chars>...>) {
-    return array<char, sizeof...(Chars)>{{Chars...}};
+    return make_array<CharT>(static_cast<CharT>(Chars)...);
 }
-template<char const * String, std::size_t I, std::size_t E, char ...Chars,
+template<char const * String, std::size_t I, std::size_t E, typename CharT, char ...Chars,
          DESALT_REQUIRE_C(I != E)>
 auto unescape(type_seq<std::integral_constant<char, Chars>...>) {
-    return here::unescape<String, String[I] == '%' ? I+2 : I+1, E>(type_seq<std::integral_constant<char, Chars>..., std::integral_constant<char, String[I]>>{});
+    return here::unescape<String, String[I] == '%' ? I+2 : I+1, E, CharT>(type_seq<std::integral_constant<char, Chars>..., std::integral_constant<char, String[I]>>{});
 }
 
 // text
 template<char const * String, std::size_t I, std::size_t E>
 struct text {
-    template<typename ...Args>
-    void write(std::ostream & ost, Args const & ...) const {
-        auto s = here::unescape<String, I, E>(type_seq<>{});
-        ost.write(s.data(), s.size());
+    template<typename OStream, typename ...Args>
+    void write(OStream & ost, Args const & ...) const {
+        auto s = here::unescape<String, I, E, typename OStream::char_type>(type_seq<>{});
+        write_impl(ost, s);
     }
+    template<typename OStream, std::size_t N>
+    static void write_impl(OStream & ost, array<typename OStream::char_type, N> const & s) {
+        ost.write(s.data(), N);
+    }
+    template<typename OStream>
+    static void write_impl(OStream &, array<typename OStream::char_type, 0> const &) {}
 };
 
 // placeholder
@@ -142,8 +147,8 @@ struct placeholder {
     using argument_formatter_type = traits::argument_formatter<String, I, E, T>;
     static constexpr std::size_t end_pos = argument_formatter_type::end_pos;
     static constexpr std::size_t used_indexes_count = argument_formatter_type::used_indexes_count;
-    template<typename ...Args>
-    void write(std::ostream & ost, Args const & ...args) const {
+    template<typename OStream, typename ...Args>
+    void write(OStream & ost, Args const & ...args) const {
         argument_formatter_type::format(ost, std::get<PlaceholderIndex>(std::tie(args...)), args...);
     }
 };
@@ -151,8 +156,8 @@ struct placeholder {
 // composite_formatter
 template<typename F1, typename F2>
 struct composite_formatter {
-    template<typename ...Args>
-    void write(std::ostream & ost, Args const & ...args) const {
+    template<typename OStream, typename ...Args>
+    void write(OStream & ost, Args const & ...args) const {
         f1.write(ost, args...);
         f2.write(ost, args...);
     }
