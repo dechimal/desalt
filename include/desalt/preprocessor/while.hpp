@@ -420,6 +420,6 @@
 #define DESALT_PP_WHILE_8_1(p, op, st) DESALT_PP_WHILE_8_1_I(p, op, DESALT_PP_WHILE_8_0(p, op, st))
 #define DESALT_PP_WHILE_8_1_I(p, op, st) DESALT_PP_WHILE_8_1_II(p, op, st)
 #define DESALT_PP_WHILE_8_1_II(p, op, st) BOOST_PP_IF(P(7, st), DESALT_PP_WHILE_8_0, st BOOST_PP_TUPLE_EAT(3))(p, op, st)
-#define DESALT_PP_WHILE_8_0(p, op, st) oP(7, st)
+#define DESALT_PP_WHILE_8_0(p, op, st) op(7, st)
 
 #endif
