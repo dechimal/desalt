@@ -30,10 +30,10 @@ namespace desalt { namespace format { namespace traits {
 template<char const * String, std::size_t I, std::size_t E>
 struct argument_formatter<String, I, E, my_int> {
     static_assert(E - I >= 4, "");
-    static_assert(*(String + I + 0) == 'h', "");
-    static_assert(*(String + I + 1) == 'o', "");
-    static_assert(*(String + I + 2) == 'g', "");
-    static_assert(*(String + I + 3) == 'e', "");
+    static_assert(String[I+0] == 'h', "");
+    static_assert(String[I+1] == 'o', "");
+    static_assert(String[I+2] == 'g', "");
+    static_assert(String[I+3] == 'e', "");
     static constexpr std::size_t end_pos = I + 4;
     static constexpr std::size_t used_indexes_count = 0;
     template<typename ...Args>
@@ -46,9 +46,10 @@ struct argument_formatter<String, I, E, my_int> {
 
 #define TEST(format, ...) ATTOTEST_ASSERT_EQUAL(::printf(format, __VA_ARGS__), DESALT_FORMAT_STRING(format, __VA_ARGS__))
 
+
 ATTOTEST_CASE(format_test) {
     namespace f = desalt::format::detail;
-    std::array<int, 5> const hoge{1, 2, 3, 4, 5};
+    std::array<int, 5> const hoge{{1, 2, 3, 4, 5}};
     ATTOTEST_ASSERT_EQUAL(f::find(hoge.begin(), hoge.end(), 5), std::prev(hoge.end()));
 
     TEST("%d", 1);

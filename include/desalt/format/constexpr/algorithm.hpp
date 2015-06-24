@@ -4,13 +4,13 @@
 namespace desalt { namespace format { namespace detail {
 namespace here = detail;
 
-template<typename T>
-constexpr T const * next(T const * p) {
-    return p+1;
+template<typename I>
+constexpr I next(I i) {
+    return i+1;
 }
-template<typename T>
-constexpr T const * prev(T const * p) {
-    return p-1;
+template<typename I>
+constexpr I prev(I i) {
+    return i-1;
 }
 
 template<typename T>

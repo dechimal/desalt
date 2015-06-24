@@ -6,21 +6,24 @@
 namespace desalt { namespace format { namespace detail {
 namespace here = detail;
 
-template<typename I> constexpr I find_placeholder(I, I);
-template<typename I> constexpr I find_placeholder_1(I, I);
-template<typename I> constexpr I find_placeholder_2(I, I, I);
-
 template<typename I>
 constexpr I find_placeholder(I f, I l) {
-    return here::find_placeholder_1(l, here::find(f, l, '%'));
-}
-template<typename I>
-constexpr I find_placeholder_1(I l, I i) {
-    return i == l ? i : here::find_placeholder_2(l, i, here::find(here::next(i), l, '%'));
-}
-template<typename I>
-constexpr I find_placeholder_2(I l, I i, I j) {
-    return j == l || j != i+1 ? i : here::find_placeholder(here::next(j), l);
+    struct impl {
+        static constexpr I f1(I f, I l) {
+            return impl::f2(l, here::find(f, l, '%'));
+        }
+        static constexpr I f2(I l, I i) {
+            return i == l
+                ? i
+                : impl::f3(l, i, here::next(i));
+        }
+        static constexpr I f3(I l, I i, I j) {
+            return j == l || *j != '%'
+                ? i
+                : impl::f1(here::next(j), l);
+        }
+    };
+    return impl::f1(f, l);
 }
 
 }}}

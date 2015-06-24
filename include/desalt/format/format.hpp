@@ -17,6 +17,7 @@
 #include <desalt/format/constexpr/array.hpp>
 #include <desalt/format/detail/toi.hpp>
 #include <desalt/format/detail/find_placeholder.hpp>
+#include <desalt/static_if.hpp>
 
 namespace desalt { namespace format { namespace traits {
 
@@ -40,8 +41,8 @@ struct argument_formatter {
 
 #define DESALT_FORMAT(f, ...) DESALT_FORMAT_I(f, __VA_ARGS__ BOOST_PP_COMMA_IF(BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 1)))
 #define DESALT_FORMAT_I(...) DESALT_FORMAT_II(__VA_ARGS__)
-#define DESALT_FORMAT_II(f, str, ...) \
-    (desalt::format::detail::make_formatter<desalt::format::detail::to_str<std::integer_sequence<char, BOOST_PP_ENUM(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, str)>>>::f(__VA_ARGS__))
+#define DESALT_FORMAT_II(f, format_string, ...) \
+    (desalt::format::detail::make_formatter<decltype(desalt::format::detail::to_str<char, BOOST_PP_ENUM(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, format_string)>())>::f(__VA_ARGS__))
 #define DESALT_FORMAT_M(z, i, format) \
     (i < sizeof(format) ? format[i] : '\0')
 
@@ -54,38 +55,22 @@ using pp::type_seq;
 using pp::at_c;
 
 // forward declarations
+template<typename T> struct make_formatter;
+template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex> auto parse_format_string();
 template<typename, typename> struct composite_formatter;
+template<typename F1, typename F2> composite_formatter<F1, F2> compose(F1, F2);
 template<char const *, std::size_t, std::size_t> struct text;
 template<char const *, std::size_t, std::size_t, typename, std::size_t> struct placeholder;
+template<typename CharT, CharT const *> struct string_holder;
+template<typename CharT> constexpr std::size_t strlen(CharT const * str, std::size_t i = 0);
 template<typename> struct ostream_adaptor;
-
-template<typename F1, typename F2> composite_formatter<F1, F2> compose(F1, F2);
 template<typename F> ostream_adaptor<F> make_ostream_adaptor(F);
 
-// parse_format_string
-template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex,
-         DESALT_REQUIRE_C(here::find_placeholder(String+I, String+E) == String+E)>
-auto parse_format_string() {
-    return text<String, I, E>{};
-}
-template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex,
-         std::size_t PlaceholderPos = here::find_placeholder(String+I, String+E)-String,
-         DESALT_REQUIRE_C(PlaceholderPos != E)>
-auto parse_format_string() {
-    using index_specifier_pos = std::integral_constant<std::size_t, here::find_index_specifier(String+PlaceholderPos+1, String+E)-String>;
-    using has_index = std::integral_constant<bool, index_specifier_pos::value != PlaceholderPos+1>;
-    using index = std::integral_constant<unsigned, has_index::value ? here::toi<unsigned>(String+PlaceholderPos+1, String+index_specifier_pos::value-1)-1 : PlaceholderIndex>;
-    using placeholder = here::placeholder<String, index_specifier_pos::value, E, typename at_c<Seq, index::value>::type, index::value>;
-    return here::compose(text<String, I, PlaceholderPos>{},
-                         here::compose(placeholder{},
-                                       here::parse_format_string<String, placeholder::end_pos, E, Seq, PlaceholderIndex+!has_index::value+placeholder::used_indexes_count>()));
-}
-
 // make_formatter
-template<typename T>
-struct make_formatter {
+template<char const * String>
+struct make_formatter<string_holder<char, String>> {
     template<typename ...Args>
-    using formatter = decltype(here::parse_format_string<T::str, 0, here::find(T::str, T::str + sizeof(T::str), '\0') - T::str, type_seq<Args...>, 0>());
+    using formatter = decltype(here::parse_format_string<String, 0, here::strlen(String), type_seq<Args...>, 0>());
     template<typename ...Args>
     static std::string string(Args const & ...args) {
         std::stringstream ss;
@@ -103,6 +88,26 @@ struct make_formatter {
         formatter<Args...>().write(std::cout, args...);
     }
 };
+
+// parse_format_string
+template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex>
+auto parse_format_string() {
+    constexpr auto placeholder_head = here::find_placeholder(String+I, String+E)-String;
+    return desalt::static_if<placeholder_head == E, std::integral_constant<std::size_t, placeholder_head>>([] (auto end_v) {
+        constexpr auto end = decltype(end_v)::type::value;
+        return text<String, I, end>{};
+    }, [] (auto placeholder_head_v) {
+        constexpr auto placeholder_head = decltype(placeholder_head_v)::type::value;
+        constexpr auto index_specifier_pos = here::find_index_specifier(String+placeholder_head+1, String+E)-String;
+        constexpr auto has_index = index_specifier_pos != placeholder_head+1;
+        constexpr auto index = has_index ? here::toi<unsigned>(String+placeholder_head+1, String+index_specifier_pos-1)-1 : PlaceholderIndex;
+        using placeholder = here::placeholder<String, index_specifier_pos, E, typename at_c<Seq, index>::type, index>;
+        constexpr auto next_placeholder_index = PlaceholderIndex+!has_index+placeholder::used_indexes_count;
+        return here::compose(text<String, I, placeholder_head>{},
+                             here::compose(placeholder{},
+                                           here::parse_format_string<String, placeholder::end_pos, E, Seq, next_placeholder_index>()));
+    });
+}
 
 // ostream_adaptor
 template<typename F> struct ostream_adaptor { F f; };
@@ -169,11 +174,19 @@ composite_formatter<F1, F2> compose(F1, F2) {
     return composite_formatter<F1, F2>();
 }
 
-template<typename T> struct to_str;
+template<typename CharT, CharT const * String>
+struct string_holder {};
+
 template<typename CharT, CharT ...Chars>
-struct to_str<std::integer_sequence<CharT, Chars...>> {
-    static constexpr CharT const str[] = { Chars ... };
-};
+auto to_str() {
+    static constexpr char buf[] = { Chars... };
+    return string_holder<CharT, buf>{};
+}
+
+template<typename CharT>
+constexpr std::size_t strlen(CharT const * str, std::size_t i) {
+    return *(str + i) == static_cast<CharT>('\0') ? i : here::strlen(str, i+1);
+}
 
 }}}
 
