@@ -7,7 +7,10 @@
 #include <type_traits>
 #include <utility>
 #include <boost/preprocessor/config/limits.hpp>
-#include <boost/preprocessor/repetition/enum.hpp>
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/repetition/enum_binary_params.hpp>
+#include <boost/preprocessor/facilities/intercept.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/comparison/equal.hpp>
 #include <boost/preprocessor/variadic/size.hpp>
@@ -17,7 +20,7 @@
 #include <desalt/format/constexpr/array.hpp>
 #include <desalt/format/detail/toi.hpp>
 #include <desalt/format/detail/find_placeholder.hpp>
-#include <desalt/static_if.hpp>
+#include <desalt/static_control/static_if.hpp>
 
 namespace desalt { namespace format { namespace traits {
 
@@ -42,9 +45,10 @@ struct argument_formatter {
 #define DESALT_FORMAT(f, ...) DESALT_FORMAT_I(f, __VA_ARGS__ BOOST_PP_COMMA_IF(BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 1)))
 #define DESALT_FORMAT_I(...) DESALT_FORMAT_II(__VA_ARGS__)
 #define DESALT_FORMAT_II(f, format_string, ...) \
-    (desalt::format::detail::make_formatter<decltype(desalt::format::detail::to_str<char, BOOST_PP_ENUM(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, format_string)>())>::f(__VA_ARGS__))
-#define DESALT_FORMAT_M(z, i, format) \
-    (i < sizeof(format) ? format[i] : '\0')
+    [&] { struct type_encoded_format_string { BOOST_PP_REPEAT(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, format_string) }; \
+          return desalt::format::detail::make_formatter<type_encoded_format_string>::f(__VA_ARGS__); }()
+#define DESALT_FORMAT_M(z, i, format_string) \
+    using BOOST_PP_CAT(t, i) = desalt::format::detail::char_type<(i < sizeof(format_string) / sizeof(*format_string) ? format_string[i] : '\0')>;
 
 namespace desalt { namespace format {
 
@@ -53,6 +57,7 @@ namespace here = detail;
 namespace pp = desalt::parameter_pack;
 using pp::type_seq;
 using pp::at_c;
+using static_control::static_if;
 
 // forward declarations
 template<typename T> struct make_formatter;
@@ -61,16 +66,17 @@ template<typename, typename> struct composite_formatter;
 template<typename F1, typename F2> composite_formatter<F1, F2> compose(F1, F2);
 template<char const *, std::size_t, std::size_t> struct text;
 template<char const *, std::size_t, std::size_t, typename, std::size_t> struct placeholder;
-template<typename CharT, CharT const *> struct string_holder;
 template<typename CharT> constexpr std::size_t strlen(CharT const * str, std::size_t i = 0);
 template<typename> struct ostream_adaptor;
 template<typename F> ostream_adaptor<F> make_ostream_adaptor(F);
+template<char C> using char_type = std::integral_constant<char, C>;
 
 // make_formatter
-template<char const * String>
-struct make_formatter<string_holder<char, String>> {
+template<typename T>
+struct make_formatter {
+    static constexpr char buf[] = { BOOST_PP_ENUM_BINARY_PARAMS(BOOST_PP_LIMIT_REPEAT, T::t, ::value BOOST_PP_INTERCEPT) };
     template<typename ...Args>
-    using formatter = decltype(here::parse_format_string<String, 0, here::strlen(String), type_seq<Args...>, 0>());
+    using formatter = decltype(here::parse_format_string<buf, 0, here::strlen(buf), type_seq<Args...>, 0>());
     template<typename ...Args>
     static std::string string(Args const & ...args) {
         std::stringstream ss;
@@ -88,22 +94,23 @@ struct make_formatter<string_holder<char, String>> {
         formatter<Args...>().write(std::cout, args...);
     }
 };
+template<typename T>
+constexpr char make_formatter<T>::buf[];
 
 // parse_format_string
 template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex>
 auto parse_format_string() {
     constexpr auto placeholder_head = here::find_placeholder(String+I, String+E)-String;
-    return desalt::static_if<placeholder_head == E, std::integral_constant<std::size_t, placeholder_head>>([] (auto end_v) {
-        constexpr auto end = decltype(end_v)::type::value;
-        return text<String, I, end>{};
-    }, [] (auto placeholder_head_v) {
-        constexpr auto placeholder_head = decltype(placeholder_head_v)::type::value;
-        constexpr auto index_specifier_pos = here::find_index_specifier(String+placeholder_head+1, String+E)-String;
-        constexpr auto has_index = index_specifier_pos != placeholder_head+1;
-        constexpr auto index = has_index ? here::toi<unsigned>(String+placeholder_head+1, String+index_specifier_pos-1)-1 : PlaceholderIndex;
+    return here::static_if([&] (auto dep, std::enable_if_t<dep(placeholder_head) == E>* = nullptr) {
+        return text<String, I, dep(placeholder_head)>{};
+    }, [&] (auto dep) {
+        constexpr auto head = dep(placeholder_head);
+        constexpr auto index_specifier_pos = here::find_index_specifier(String+head+1, String+E)-String;
+        constexpr auto has_index = index_specifier_pos != head+1;
+        constexpr auto index = has_index ? here::toi<unsigned>(String+head+1, String+index_specifier_pos-1)-1 : PlaceholderIndex;
         using placeholder = here::placeholder<String, index_specifier_pos, E, typename at_c<Seq, index>::type, index>;
         constexpr auto next_placeholder_index = PlaceholderIndex+!has_index+placeholder::used_indexes_count;
-        return here::compose(text<String, I, placeholder_head>{},
+        return here::compose(text<String, I, head>{},
                              here::compose(placeholder{},
                                            here::parse_format_string<String, placeholder::end_pos, E, Seq, next_placeholder_index>()));
     });
@@ -172,15 +179,6 @@ struct composite_formatter {
 template<typename F1, typename F2>
 composite_formatter<F1, F2> compose(F1, F2) {
     return composite_formatter<F1, F2>();
-}
-
-template<typename CharT, CharT const * String>
-struct string_holder {};
-
-template<typename CharT, CharT ...Chars>
-auto to_str() {
-    static constexpr char buf[] = { Chars... };
-    return string_holder<CharT, buf>{};
 }
 
 template<typename CharT>

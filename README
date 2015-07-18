@@ -75,5 +75,15 @@ Newtype
   desalt/newtype.hpp
 
 Format
+
   Header
   desalt/format.hpp
+
+StaticControl
+
+  Header
+  desalt/static_control.hpp
+  desalt/static_control/static_control.hpp
+  desalt/static_control/static_if.hpp
+  desalt/static_control/static_match.hpp
+  desalt/static_control/macro.hpp
