@@ -2,43 +2,64 @@
 #define      STATIC_CONTROL_STATIC_MATCH_HPP_INCLUDED_
 
 #include <type_traits>
-#include <desalt/static_control/detail/wrap.hpp>
-#include <desalt/static_control/detail/is_valid.hpp>
 
 namespace desalt { namespace static_control {
 namespace here = static_control;
 
 // forward declarations
-template<typename ..., typename F, typename ...Fs> constexpr auto static_match(F f, Fs ...fs);
+template<typename ...Ts> constexpr auto static_match(Ts && ...);
 
 namespace detail {
 namespace here = detail;
 
-template<typename ..., typename F, typename ...Fs> constexpr auto static_match_impl(std::true_type, F, Fs ...);
-template<typename ..., typename F0, typename F1, typename ...Fs> constexpr auto static_match_impl(std::false_type, F0, F1 f1, Fs ...);
-template<typename ..., typename F0> constexpr void static_match_impl(std::false_type, F0);
+template<std::size_t, typename ...Ts> constexpr auto static_match_impl_1(Ts && ...);
+template<std::size_t, typename Trailing, typename ...Ts> constexpr auto static_match_impl_2(std::true_type, Trailing, Ts && ...);
+template<std::size_t, typename ...Ts> constexpr auto static_match_impl_2(std::false_type, std::true_type, Ts && ...);
+template<std::size_t, typename ...Ts> constexpr auto static_match_impl_2(std::false_type, std::false_type, Ts && ...);
+template<typename F, typename ...Ts, typename = decltype(std::declval<F>()(std::declval<Ts>()...))> constexpr std::true_type is_valid(int);
+template<typename F, typename ...Ts> constexpr std::false_type is_valid(...);
 
 } // namespace detail {
 
 
 // static_match function implementation
-template<typename ...Ts, typename F, typename ...Fs>
-constexpr auto static_match(F f, Fs ...fs) {
-    return detail::static_match_impl<Ts...>(detail::is_valid<F, detail::wrap<Ts>...>(0), f, fs...);
+template<typename ...Ts>
+constexpr auto static_match(Ts && ...ts) {
+    return detail::static_match_impl_1<0>(std::forward<Ts>(ts)...);
 }
 
 namespace detail {
 
-template<typename ...Ts, typename F, typename ...Fs>
-constexpr auto static_match_impl(std::true_type, F f, Fs ...) {
-    return f(wrap<Ts>{}...);
+template<std::size_t I, typename ...Ts>
+constexpr auto static_match_impl_1(Ts && ...ts) {
+    return [&] (auto f, auto ...fs) {
+        auto valid = detail::is_valid<decltype(f), Ts &&...>(0);
+        auto trailing = std::integral_constant<bool, sizeof...(fs)>{};
+        return here::static_match_impl_2<I>(valid, trailing, std::forward<Ts>(ts)...)(std::move(f), std::move(fs)...);
+    };
 }
-template<typename ...Ts, typename F0, typename F1, typename ...Fs>
-constexpr auto static_match_impl(std::false_type, F0, F1 f1, Fs ...fs) {
-    return here::static_match_impl<Ts...>(here::is_valid<F1, wrap<Ts>...>(0), f1, fs...);
+
+template<std::size_t, typename Trailing, typename ...Ts>
+constexpr auto static_match_impl_2(std::true_type, Trailing, Ts && ...ts) {
+    return [&] (auto f, auto && ...) {
+        return f(std::forward<Ts>(ts)...);
+    };
 }
-template<typename ..., typename F0>
-constexpr void static_match_impl(std::false_type, F0) {}
+template<std::size_t I, typename ...Ts>
+constexpr auto static_match_impl_2(std::false_type, std::true_type, Ts && ...ts) {
+    return [&] (auto &&, auto ...fs) {
+        return here::static_match_impl_1<I+1>(std::forward<Ts>(ts)...)(std::move(fs)...);
+    };
+}
+template<std::size_t, typename ...Ts>
+constexpr auto static_match_impl_2(std::false_type, std::false_type, Ts && ...ts) {
+    return [&] (auto &&) {};
+}
+
+template<typename F, typename ...Ts, typename>
+constexpr std::true_type is_valid(int) { return {}; }
+template<typename F, typename ...Ts>
+constexpr std::false_type is_valid(...) { return {}; }
 
 } // namespace detail {
 

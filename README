@@ -1,13 +1,15 @@
-Desalt - C++14 Utility Libraries
+Desalt - C++1z Utility Libraries
 
-Desalt ease using some metaprogramming idiom on C++14.
+Desalt ease using some metaprogramming idiom on C++1z.
 
 Library includes following features:
 
-- AutoFun : Deduce return type of a function by the body at the definition.
+- AutoFun : Deduce return type of a function by the expression of return statement.
 - Require : Conditional overloaded function selection using SFINAE.
 - ParameterPack : Assist metaprogramming with parameter pack.
 - Newtype : Make a different type with existing type easily (inspired by Haskell's newtype),
+- StaticControl : sfinae-based compile-time branch and loop (static if, static for, etc...).
+- Format : A extensible printf.
 
 The samples are under test/ directory.
 
@@ -74,16 +76,21 @@ Newtype
   Header
   desalt/newtype.hpp
 
-Format
-
-  Header
-  desalt/format.hpp
-
 StaticControl
 
-  Header
+  Headers
   desalt/static_control.hpp
   desalt/static_control/static_control.hpp
   desalt/static_control/static_if.hpp
   desalt/static_control/static_match.hpp
-  desalt/static_control/macro.hpp
+  desalt/static_control/static_while.hpp
+  desalt/static_control/static_for.hpp
+  desalt/static_control/with_unpacked.hpp
+  desalt/static_control/with_index_sequence.hpp
+  desalt/static_control/wrap.hpp
+  desalt/static_control/clause.hpp
+
+Format
+
+  Header
+  desalt/format.hpp
