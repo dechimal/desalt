@@ -61,7 +61,7 @@ using static_control::static_if;
 
 // forward declarations
 template<typename T> struct make_formatter;
-template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex> auto parse_format_string();
+template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex, unsigned = here::find_placeholder(String+I, String+E)-String> auto parse_format_string();
 template<typename, typename> struct composite_formatter;
 template<typename F1, typename F2> composite_formatter<F1, F2> compose(F1, F2);
 template<char const *, std::size_t, std::size_t> struct text;
@@ -98,13 +98,13 @@ template<typename T>
 constexpr char make_formatter<T>::buf[];
 
 // parse_format_string
-template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex>
+template<char const * String, std::size_t I, std::size_t E, typename Seq, unsigned PlaceholderIndex,
+    unsigned placeholder_head>
 auto parse_format_string() {
-    constexpr auto placeholder_head = here::find_placeholder(String+I, String+E)-String;
-    return here::static_if([&] (auto dep, std::enable_if_t<dep(placeholder_head) == E>* = nullptr) {
+    return here::static_if([&] (auto dep, std::enable_if_t<decltype(dep){}(placeholder_head) == E>* = nullptr) {
         return text<String, I, dep(placeholder_head)>{};
     }, [&] (auto dep) {
-        constexpr auto head = dep(placeholder_head);
+        constexpr auto head = decltype(dep){}(placeholder_head);
         constexpr auto index_specifier_pos = here::find_index_specifier(String+head+1, String+E)-String;
         constexpr auto has_index = index_specifier_pos != head+1;
         constexpr auto index = has_index ? here::toi<unsigned>(String+head+1, String+index_specifier_pos-1)-1 : PlaceholderIndex;
