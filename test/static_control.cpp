@@ -11,7 +11,6 @@ using sc::static_match;
 using sc::static_if;
 using sc::static_while;
 using sc::static_for;
-using sc::depend;
 
 template<typename T>
 bool f(T const & x) {
@@ -31,7 +30,7 @@ bool f(T const & x) {
 struct hoge { using type = int; };
 
 // This example is to make a metafunction using generic lambda.
-// Non constant expression `has_type_v0` makes constant expression `has_type_v`.
+// Non constant expression `has_type_impl` makes constant expression `has_type_v`.
 // Class template `wrap` carries template parameter `T`. `wrap<T>::type` is `T`.
 template<typename T>
 auto has_type_impl = ::static_match(sc::wrap<T>{})(
@@ -44,27 +43,27 @@ constexpr auto has_type_v = decltype(has_type_impl<T>){};
 int main() {
     assert(::f(hoge{}));
     assert(!::f(0));
-    static_assert(has_type_v<hoge>);
-    static_assert(!has_type_v<int>);
+    static_assert(has_type_v<hoge>, "static_control.cpp assert 1");
+    static_assert(!has_type_v<int>, "static_control.cpp assert 2");
 
     // In `static_if`, first argument of each clauses named "dep" makes a dependency
     // and prevent to instanciate when the clause is not selected.
     // `dep(expr)` equals `expr` but first is dependent expression.
     // `depent<type, dep>` equals `type` but first is dependent type.
-    ::static_if([] (auto dep, typename depend<hoge, dep>::type = {}) {
-        static_assert(true);
+    ::static_if([] (auto dep, typename decltype(dep.type(sc::wrap<hoge>{}))::type = {}) {
+        static_assert(dep(true), "static_control.cpp assert 3");
     }, [] (auto dep) {
-        static_assert(sizeof(typename depend<int, dep>::type) - sizeof(int));
+        static_assert(dep(false), "this should be instanciated");
     });
 
-    ::static_if([] (auto dep, typename depend<int, dep>::type = {}) {
-        static_assert(sizeof(typename depend<int, dep>::type) - sizeof(int));
+    ::static_if([] (auto dep, typename decltype(dep.type(sc::wrap<int>{}))::type = {}) {
+        static_assert(dep(false), "static_control.cpp assert 4");
     });
 
     ::static_match(sc::wrap<int>{})([&] (auto x, sc::wrap<decltype(std::declval<typename decltype(x)::type&>()++)>* = {}) {
-        static_assert(true);
+        static_assert((decltype(x){}, true), "static_control.cpp assert 5");
     }, [&] (auto x) {
-        static_assert(sizeof(typename decltype(x)::type) - sizeof(int));
+        static_assert((decltype(x){}, false), "this should be instanciated");
     });
 
     // `static_for(x0, x1, ... xn, f)` is used to compile-time loop.
@@ -81,11 +80,12 @@ int main() {
     //   - if type of `f(i, xs...)` is `void`, then empty,
     //   - otherwise `f(i, xs...)`.
     std::tuple<int, std::string, double> tup{42, "hoge", 3.5};
-    constexpr auto size = std::tuple_size<decltype(tup)>::value;
+    constexpr auto size = std::tuple_size<decltype(tup)>{};
     auto n = 0;
-    auto m = ::static_for([&] (auto i, std::enable_if_t<(i < size)> * = {}) {
+    auto m = ::static_for([&] (auto i, std::enable_if_t<(decltype(i){} < size)> * = {}) {
         std::cerr << std::get<i>(tup) << std::endl;
         ++n;
     });
-    assert(n == size && std::get<0>(m) == size);
+    assert(n == size);
+    assert(std::get<0>(m) == size);
 }

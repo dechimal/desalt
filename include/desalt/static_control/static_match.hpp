@@ -13,8 +13,8 @@ namespace detail {
 namespace here = detail;
 
 template<std::size_t, typename ...Ts> constexpr auto static_match_impl_1(Ts && ...);
-template<std::size_t, typename Trailing, typename ...Ts> constexpr auto static_match_impl_2(std::true_type, Trailing, Ts && ...);
-template<std::size_t, typename ...Ts> constexpr auto static_match_impl_2(std::false_type, std::true_type, Ts && ...);
+template<std::size_t, typename Trailing, std::size_t ...Is, typename Args, typename F, typename ...Fs> constexpr auto static_match_impl_2(std::true_type, Trailing, std::index_sequence<Is...>, Args &&, F &&, Fs && ...);
+template<std::size_t, std::size_t ...Is, typename Args, typename F, typename ...Fs> constexpr auto static_match_impl_2(std::false_type, std::true_type, std::index_sequence<Is...>, Args &&, F &&, Fs && ...);
 template<std::size_t, typename ...Ts> constexpr auto static_match_impl_2(std::false_type, std::false_type, Ts && ...);
 template<typename F, typename ...Ts, typename = decltype(std::declval<F>()(std::declval<Ts>()...))> constexpr std::true_type is_valid(int);
 template<typename F, typename ...Ts> constexpr std::false_type is_valid(...);
@@ -35,25 +35,22 @@ constexpr auto static_match_impl_1(Ts && ...ts) {
     return [&] (auto f, auto ...fs) {
         auto valid = detail::is_valid<decltype(f), Ts &&...>(0);
         auto trailing = std::integral_constant<bool, sizeof...(fs)>{};
-        return here::static_match_impl_2<I>(valid, trailing, std::forward<Ts>(ts)...)(std::move(f), std::move(fs)...);
+        auto tup = std::forward_as_tuple(std::forward<Ts>(ts)...);
+        return here::static_match_impl_2<I>(valid, trailing, std::index_sequence_for<Ts...>{}, std::move(tup), std::move(f), std::move(fs)...);
     };
 }
 
-template<std::size_t, typename Trailing, typename ...Ts>
-constexpr auto static_match_impl_2(std::true_type, Trailing, Ts && ...ts) {
-    return [&] (auto f, auto && ...) {
-        return f(std::forward<Ts>(ts)...);
-    };
+template<std::size_t, typename Trailing, std::size_t ...Is, typename Args, typename F, typename ...Fs>
+constexpr auto static_match_impl_2(std::true_type, Trailing, std::index_sequence<Is...>, Args && args, F && f, Fs && ...) {
+    return f(std::forward<decltype(std::get<Is>(args))>(std::get<Is>(args))...);
 }
-template<std::size_t I, typename ...Ts>
-constexpr auto static_match_impl_2(std::false_type, std::true_type, Ts && ...ts) {
-    return [&] (auto &&, auto ...fs) {
-        return here::static_match_impl_1<I+1>(std::forward<Ts>(ts)...)(std::move(fs)...);
-    };
+template<std::size_t I, std::size_t ...Is, typename Args, typename F, typename ...Fs>
+constexpr auto static_match_impl_2(std::false_type, std::true_type, std::index_sequence<Is...>, Args && args, F &&, Fs && ...fs) {
+    return here::static_match_impl_1<I+1>(std::forward<decltype(std::get<Is>(args))>(std::get<Is>(args))...)(std::forward<Fs>(fs)...);
 }
 template<std::size_t, typename ...Ts>
-constexpr auto static_match_impl_2(std::false_type, std::false_type, Ts && ...ts) {
-    return [&] (auto &&) {};
+constexpr auto static_match_impl_2(std::false_type, std::false_type, Ts && ...) {
+    return [] (auto &&) {};
 }
 
 template<typename F, typename ...Ts, typename>
