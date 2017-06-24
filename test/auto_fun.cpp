@@ -5,7 +5,7 @@
 template<typename T>
 DESALT_AUTO_FUN_NOEXCEPT(f(T a, T b), a + b);
 template<typename T>
-DESALT_AUTO_FUN_NOEXCEPT(g(T a, T b), throw 1);
+DESALT_AUTO_FUN_NOEXCEPT(g(T, T), throw 1);
 
 static_assert(noexcept(::f(1, 2)), "1");
 static_assert(!noexcept(::g(1, 2)), "2");
