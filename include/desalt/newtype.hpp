@@ -32,7 +32,7 @@
 #include <desalt/preprocessor/starts_with_enclosing_paren.hpp>
 
 #define DESALT_NEWTYPE(wrapped, base, ...) \
-    DESALT_NEWTYPE_I(wrapped, typename BOOST_IDENTITY_TYPE((DESALT_PP_TUPLE_REM_IF_PAREN(base) base)), \
+    DESALT_NEWTYPE_I(wrapped, desalt::newtype::paren_protect<void(desalt::newtype::paren_protect_t<DESALT_PP_TUPLE_REM_IF_PAREN(base) base>)>, \
                      __VA_ARGS__ \
                      BOOST_PP_COMMA_IF(BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 1)))
 #define DESALT_NEWTYPE_I(wrapped, base, ...) \
@@ -41,9 +41,9 @@
     struct wrapped : private desalt::newtype::base_wrapper<base> { \
         base & unwrap() noexcept { return *this; } \
         base const & unwrap() const noexcept { return *this; } \
-        friend class desalt::newtype::wrapper_access; \
-        explicit wrapped(base const & b) noexcept(noexcept(base(b))) : desalt::newtype::base_wrapper<base>(b) {} \
-        explicit wrapped(base && b) noexcept(noexcept(base(std::move(b)))) : desalt::newtype::base_wrapper<base>(std::move(b)) {} \
+        friend struct desalt::newtype::wrapper_access; \
+        explicit wrapped(typename base const & b) noexcept(noexcept(base(b))) : desalt::newtype::base_wrapper<base>(b) {} \
+        explicit wrapped(typename base && b) noexcept(noexcept(base(std::move(b)))) : desalt::newtype::base_wrapper<base>(std::move(b)) {} \
         BOOST_PP_SEQ_FOR_EACH(DESALT_NEWTYPE_M, (wrapped, base), BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)) \
     }
 
@@ -68,7 +68,7 @@
 #define DESALT_NEWTYPE_KW_typename ,
 #define DESALT_NEWTYPE_GET_MACRO_typename DESALT_NEWTYPE_USING_TYPENAME,
 #define DESALT_NEWTYPE_USING_TYPENAME(typename_, wrapped, base) \
-    using base::typename_;
+    using typename base::typename_;
 
 // auto
 #define DESALT_NEWTYPE_KW_auto ,
@@ -260,6 +260,14 @@
 
 namespace desalt { namespace newtype {
 namespace mpl = boost::mpl;
+
+template<typename> struct paren_protect_t;
+template<typename T> struct paren_protect_t<void(paren_protect_t<T>)> {
+    using type = T;
+};
+
+template<typename T>
+using paren_protect = typename paren_protect_t<T>::type;
 
 template<typename T>
 struct unqualify

@@ -5,6 +5,10 @@
 
 // Haskellのnewtypeみたいなもの（ある型から，暗黙には元の型から/へは変換できない別の型を作る）
 
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wmismatched-tags"
+#endif
+
 DESALT_NEWTYPE(ivector, std::vector<int>,
     as_base,
     begin,
@@ -69,11 +73,11 @@ DESALT_NEWTYPE(darray, std::vector<T>,
             namespace operator>,
             namespace operator<=,
             namespace operator>=,
-            value_type,
-            difference_type,
-            pointer,
-            reference,
-            iterator_category
+            typename value_type,
+            typename difference_type,
+            typename pointer,
+            typename reference,
+            typename iterator_category
         );
     ),
     new (
