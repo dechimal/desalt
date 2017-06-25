@@ -8,6 +8,14 @@ namespace here = detail;
 
 template<typename I>
 constexpr I find_placeholder(I f, I l) {
+    // while (true) {
+    //     f = here::find(f, l, '%');
+    //     if (f == l) return l;
+    //     auto i = f;
+    //     ++i;
+    //     if (i == l || *i != '%') return f;
+    //     f = ++i;
+    // }
     struct impl {
         static constexpr I f1(I f, I l) {
             return impl::f2(l, here::find(f, l, '%'));
