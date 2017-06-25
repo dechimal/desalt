@@ -10,14 +10,16 @@
     DESALT_REQUIRE_C(!(__VA_ARGS__::value))
 
 #define DESALT_REQUIRE_C(...) \
-    typename std::enable_if<(__VA_ARGS__)>::type *& = desalt::aux::enabler
+    typename std::enable_if<(__VA_ARGS__), desalt::aux::enabler_t>::type = desalt::aux::enabler_t::value
 
 #define DESALT_REQUIRE_EXPR(...) \
     DESALT_REQUIRE(decltype((__VA_ARGS__), (void)0, std::true_type{}))
 
 namespace desalt { namespace aux {
 
-extern void * enabler;
+enum struct enabler_t {
+    value
+};
 
 }}
 
