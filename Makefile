@@ -6,19 +6,27 @@ HEADERDIR := $(ROOT)/include
 
 CXXFLAGS += -Werror -Wall -Wextra -pedantic-errors -Wno-parentheses -Wno-unused-parameter $(CXX1YFLAGS)
 CPPFLAGS += -I$(HEADERDIR) -I.
+
+CXXSTD ?= 14
 ifeq ($(findstring clang,$(CXX)),clang)
-CXX1YFLAGS := -std=c++14
-CXXFLAGS += -Wno-unused-local-typedef
-else
-ifeq ($(findstring g++,$(CXX)),g++)
-CXX1YFLAGS := -std=gnu++14
-endif
-endif
-ifneq ($(BOOST_INCLUDE),)
-CPPFLAGS += -I$(BOOST_INCLUDE)
+  CXXFLAGS += -Wno-unused-local-typedef
 endif
 
-export
+ifeq ($(CXXSTD),17)
+  CXXFLAGS += -std=c++1z
+else
+ifeq ($(CXXSTD),1z)
+  CXXFLAGS += -std=c++1z
+else
+  CXXFLAGS += -std=c++14
+endif
+endif
+
+ifneq ($(BOOST_INCLUDE),)
+  CPPFLAGS += -I$(BOOST_INCLUDE)
+endif
+
+export CPPFLAGS CXXFLAGS
 
 .PHONY: test clean
 

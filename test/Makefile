@@ -7,7 +7,7 @@ CXXFLAGS += -g -O0
 test: $(targets)
 	for i in $^; do ./$$i; done
 
-$(targets): % : %.o
+$(targets): % : %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 clean:
