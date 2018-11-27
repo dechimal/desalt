@@ -3,9 +3,11 @@
 
 #include <desalt/match/fwd.hpp>
 #include <tuple>
+#include <array>
 #include <variant>
 #include <vector>
 #include <map>
+#include <unordered_map>
 
 namespace desalt::match {
 
@@ -48,17 +50,37 @@ struct pattern<std::variant<Ts...>> {
     }
 };
 
-template<typename E>
-struct pattern<std::vector<E>> {
+template<typename E, typename Alloc>
+struct pattern<std::vector<E, Alloc>> {
     using size_type = typename std::vector<E>::size_type;
     template<typename Index, typename T> static bool test(Index const & i, T const & v) { return 0 <= (size_type)i && (size_type)i < v.size(); }
     template<typename Index, typename T> static decltype(auto) get(Index const & i, T && v) {
         return std::forward<T>(v)[(size_type)i];
     }
 };
-template<typename Key, typename Value>
-struct pattern<std::map<Key, Value>> {
+template<typename E, std::size_t N>
+struct pattern<std::array<E, N>> {
+    using size_type = typename std::array<E, N>::size_type;
+    template<std::size_t Index, typename T> static std::bool_constant<(Index < N)> test(T const & v) { return {}; }
+    template<typename Index, typename T> static bool test(Index const & i, T const & v) { return 0 <= (size_type)i && (size_type)i < v.size(); }
+    template<std::size_t Index, typename T> static decltype(auto) get(T && v) {
+        return std::forward<T>(v)[(size_type)Index];
+    }
+    template<typename Index, typename T> static decltype(auto) get(Index const & i, T && v) {
+        return std::forward<T>(v)[(size_type)i];
+    }
+};
+template<typename Key, typename Value, typename KeyEq, typename Alloc>
+struct pattern<std::map<Key, Value, KeyEq, Alloc>> {
     using size_type = typename std::map<Key, Value>::size_type;
+    template<typename K, typename T> static bool test(K const & k, T const & v) { return v.find(k) != v.end(); }
+    template<typename K, typename T> static decltype(auto) get(K const & k, T && v) {
+        return std::forward<T>(v).at(k);
+    }
+};
+template<typename Key, typename Value, typename KeyEq, typename Hash, typename Alloc>
+struct pattern<std::unordered_map<Key, Value, KeyEq, Hash, Alloc>> {
+    using size_type = typename std::unordered_map<Key, Value>::size_type;
     template<typename K, typename T> static bool test(K const & k, T const & v) { return v.find(k) != v.end(); }
     template<typename K, typename T> static decltype(auto) get(K const & k, T && v) {
         return std::forward<T>(v).at(k);
