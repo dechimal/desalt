@@ -82,7 +82,7 @@ int main() {
     std::tuple<int, std::string, double> tup{42, "hoge", 3.5};
     constexpr auto size = std::tuple_size<decltype(tup)>{};
     auto n = 0;
-    auto m = ::static_for([&] (auto i, std::enable_if_t<(decltype(i){} < size)> * = {}) {
+    auto m = ::static_for([&] (auto i, std::enable_if_t<(decltype(i){} < decltype(size){})> * = {}) {
         std::cerr << std::get<i>(tup) << std::endl;
         ++n;
     });

@@ -8,7 +8,7 @@ match.deps match: CXXFLAGS += -std=c++1z
 test: $(targets)
 	for i in $^; do ./$$i; done
 
-$(targets): % : %.cpp
+$(targets): % : %.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 clean:
