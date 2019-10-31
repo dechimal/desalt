@@ -1,9 +1,9 @@
 
 .PHONY: test clean
 
-targets := require auto_fun parameter_pack newtype while struct static_control format match
+targets := require auto_fun parameter_pack newtype while struct static_control format match record
 CXXFLAGS += -g -O0
-match.deps match: CXXFLAGS += -std=c++1z
+match record: CXXFLAGS += -std=c++1z
 
 test: $(targets)
 	for i in $^; do ./$$i; done
