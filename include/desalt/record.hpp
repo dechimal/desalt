@@ -2,16 +2,14 @@
 #include <type_traits>
 #include <tuple>
 
-#define DESALT_MEMBER(name) DESALT_MEMBER_I(name, DESALT_PP_CAT(value_type, name), DESALT_PP_CAT(holder, name))
-#define DESALT_MEMBER_I(name, value_type, holder) DESALT_MEMBER_II(name, value_type, holder)
-#define DESALT_MEMBER_II(name, value_type, holder) \
+#define DESALT_MEMBER(name) DESALT_MEMBER_I(name, DESALT_PP_CAT(holder, name))
+#define DESALT_MEMBER_I(name, holder) DESALT_MEMBER_II(name, holder)
+#define DESALT_MEMBER_II(name, holder) \
     (::desalt::detail::record::member_id { \
         [] () -> auto const & { return DESALT_PP_STR(name); }, \
         [] (auto && m) { return ::desalt::detail::record::memptr<&std::decay_t<decltype(m)>::name>{}; }, \
         [] (auto && v) { \
-            struct holder; \
-            using value_type = ::desalt::detail::record::make_value_type<std::decay_t<decltype(v)>, struct holder>; \
-            struct holder { value_type name; }; \
+            struct holder { typename std::decay_t<decltype(v)>::type name; }; \
             return std::conditional<true, holder, void>{}; \
         } \
     })
@@ -75,9 +73,8 @@ template<typename ...Defs> struct record;
 template<typename Symbol, typename Access, typename Cons, typename Value, bool Fun> struct member_definition;
 template<typename Def> using member_symbol = typename Def::symbol;
 template<typename Def> using member_raw_value_type = typename Def::raw_value_type;
-template<typename Def, typename Rec> using record_slice = typename Def::template record_slice<Rec>;
+template<typename Def, typename Rec> using holder = typename Def::template holder<Rec>;
 template<typename Def> using member_access = typename Def::member_access;
-template<typename F, typename Holder> using make_value_type = typename F::template make_value_type_impl<Holder>;
 
 template<typename ...Defs> constexpr std::tuple<member_symbol<Defs>...> record_members(record<Defs...> const &) { return {}; }
 template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs(record<Defs...> const &) { return {}; }
@@ -88,12 +85,12 @@ template<typename ...Defs> void valid_if_record(record<Defs...> const &);
 template<typename ...Defs> std::true_type is_record(record<Defs...> const &);
 template<typename T> std::false_type is_record(T const &);
 
-template<typename Def, typename Holder> struct slice;
+template<typename Def, typename Rec> struct slice;
 template<typename Def, typename Value> struct record_initializer { Value value; };
 template<typename Def, typename Value> constexpr auto make_record_initializer(Value && value);
 
 template<typename Symbol, typename Access, typename Cons> struct member_id;
-template<typename Rec, typename Self, typename F> struct memfun;
+template<typename Rec, typename Slice, typename F> struct memfun;
 template<typename Access> struct member_access_fun;
 template<typename F> auto make_symbol(F f);
 template<std::size_t ...Is, typename F> auto make_symbol_impl(std::index_sequence<Is...>, F f);
@@ -167,11 +164,11 @@ constexpr auto swap(Rec1 & a, Rec2 & b) -> decltype(
 
 // record
 template<typename ...Defs>
-struct record: record_slice<Defs, record<Defs...>>... {
-    using record_slice<Defs, record>::operator[]...;
+struct record: slice<Defs, record<Defs...>>... {
+    using slice<Defs, record>::operator[]...;
 
     template<typename ...Inits>
-    constexpr record(Inits && ...inits): record_slice<Defs, record>{std::forward<decltype(std::move(inits).value)>(inits.value)}... {}
+    constexpr record(Inits && ...inits): slice<Defs, record>{std::forward<decltype(std::move(inits).value)>(inits.value)}... {}
 
     template<typename ...Assigns>
     constexpr record & operator=(record<Assigns...> const & assigns) {
@@ -208,14 +205,14 @@ constexpr auto operator!=(record<Defs1...> const & rec1, record<Defs2...> const 
 }
 
 // slice
-template<typename Def, typename Holder>
-struct slice: Holder {
+template<typename Def, typename Rec>
+struct slice: holder<Def, Rec> {
     template<typename V, bool C = !Def::is_memfun, typename = std::enable_if_t<C>>
-    constexpr slice(V && v): Holder{std::forward<V>(v)} {}
+    constexpr slice(V && v): holder<Def, Rec>{std::forward<V>(v)} {}
     template<typename V, bool C = Def::is_memfun && std::is_standard_layout_v<member_raw_value_type<Def>>, typename = std::enable_if_t<C>, typename = void>
-    constexpr slice(V && v): Holder{{std::forward<V>(v)}} {}
+    constexpr slice(V && v): holder<Def, Rec>{{std::forward<V>(v)}} {}
     template<typename V, bool C = Def::is_memfun && !std::is_standard_layout_v<member_raw_value_type<Def>>, typename = std::enable_if_t<C>, typename = void, typename = void>
-    slice(V && v): Holder{{std::forward<V>(v), this}} {}
+    slice(V && v): holder<Def, Rec>{{std::forward<V>(v), static_cast<Rec *>(this)}} {}
     constexpr auto        & operator[](member_symbol<Def>)        & { return member_access<Def>{}(*this); }
     constexpr auto const  & operator[](member_symbol<Def>) const  & { return member_access<Def>{}(*this); }
     constexpr auto       && operator[](member_symbol<Def>)       && { return member_access<Def>{}(std::move(*this)); }
@@ -223,39 +220,29 @@ struct slice: Holder {
 };
 
 // memfun
-template<typename Rec, typename Self, typename F>
+template<typename Rec, typename Slice, typename F>
 struct memfun {
     template<typename ...Args>
     constexpr memfun(Args && ...args): data{std::forward<Args>(args)...} {}
     template<typename ...Args>
-    decltype(auto) operator()(Args && ...args)        & {
+    decltype(auto) operator()(Args && ...args)       {
         return std::get<0>(data)(self(), std::forward<Args>(args)...);
     }
     template<typename ...Args>
-    decltype(auto) operator()(Args && ...args) const  & {
+    decltype(auto) operator()(Args && ...args) const {
         return std::get<0>(data)(self(), std::forward<Args>(args)...);
-    }
-    template<typename ...Args>
-    decltype(auto) operator()(Args && ...args)       && {
-        return std::get<0>(data)(std::move(self()), std::forward<Args>(args)...);
-    }
-    template<typename ...Args>
-    decltype(auto) operator()(Args && ...args) const && {
-        return std::get<0>(data)(std::move(self()), std::forward<Args>(args)...);
     }
     template<typename Access> friend struct member_access_fun;
 private:
     static constexpr bool stdlayout = std::is_standard_layout_v<F>;
-    std::conditional_t<stdlayout, std::tuple<F>, std::tuple<F, Self>> data;
-    Rec       & self()       { return *static_cast<Rec       *>(_self()); }
-    Rec const & self() const { return *static_cast<Rec const *>(_self()); }
-    Self * _self() {
-        if constexpr (stdlayout) return reinterpret_cast<Self *>(this);
-        else return std::get<1>(data);
+    std::conditional_t<stdlayout, std::tuple<F>, std::tuple<F, Rec *>> data;
+    Rec & self() {
+        if constexpr (stdlayout) return *static_cast<Rec *>(reinterpret_cast<Slice *>(this));
+        else return *std::get<1>(data);
     }
-    Self const * _self() const {
-        if constexpr (stdlayout) return reinterpret_cast<Self const *>(this);
-        else return std::get<1>(data);
+    Rec const & self() const {
+        if constexpr (stdlayout) return *static_cast<Rec const *>(reinterpret_cast<Slice const *>(this));
+        else return *std::get<1>(data);
     }
 };
 
@@ -267,16 +254,9 @@ struct member_definition: Symbol {
     using member_access = Access;
     static constexpr bool is_memfun = Fun;
     template<typename Rec>
-    struct make_value_type {
-        template<typename Holder>
-        using make_value_type_impl = std::conditional_t<
-            Fun,
-            memfun<Rec, Holder, Value>,
-            Value
-        >;
-    };
-    template<typename Rec>
-    using record_slice = slice<member_definition, typename decltype(std::declval<Cons>()(make_value_type<Rec>{}))::type>;
+    using holder = typename decltype(
+        std::declval<Cons>()(std::conditional<Fun, memfun<Rec, slice<member_definition, Rec>, Value>, Value>{})
+    )::type;
 };
 
 // member_id
