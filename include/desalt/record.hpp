@@ -7,10 +7,10 @@
 #define DESALT_MEMBER_II(name, holder) \
     (::desalt::detail::record::member_id { \
         [] () -> auto const & { return DESALT_PP_STR(name); }, \
-        [] (auto && m) { return ::desalt::detail::record::memptr<&std::decay_t<decltype(m)>::name>{}; }, \
-        [] (auto && v) { \
-            struct holder { typename std::decay_t<decltype(v)>::type name; }; \
-            return std::conditional<true, holder, void>{}; \
+        [] (auto m) { return ::desalt::detail::record::memptr<&decltype(m)::type::name>{}; }, \
+        [] (auto v) { \
+            struct holder { typename decltype(v)::type name; }; \
+            return ::desalt::detail::record::idtype<holder>{}; \
         } \
     })
 
@@ -70,11 +70,12 @@ constexpr decltype(auto) ftie(Fs && ...fs) {
 
 template<typename ...Defs> struct record;
 
-template<typename Symbol, typename Access, typename Cons, typename Value, bool Fun> struct member_definition;
+template<typename Symbol, typename MemPtrFun, typename Cons, typename Value, bool Fun> struct member_definition;
 template<typename Def> using member_symbol = typename Def::symbol;
 template<typename Def> using member_raw_value_type = typename Def::raw_value_type;
 template<typename Def, typename Rec> using holder = typename Def::template holder<Rec>;
 template<typename Def> using member_access = typename Def::member_access;
+template<typename Def, typename Rec> static constexpr std::ptrdiff_t member_offset = Def::template member_offset<Rec>;
 
 template<typename ...Defs> constexpr std::tuple<member_symbol<Defs>...> record_members(record<Defs...> const &) { return {}; }
 template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs(record<Defs...> const &) { return {}; }
@@ -89,15 +90,17 @@ template<typename Def, typename Rec> struct slice;
 template<typename Def, typename Value> struct record_initializer { Value value; };
 template<typename Def, typename Value> constexpr auto make_record_initializer(Value && value);
 
-template<typename Symbol, typename Access, typename Cons> struct member_id;
-template<typename Rec, typename Slice, typename F> struct memfun;
-template<typename Access> struct member_access_fun;
+template<typename Symbol, typename MemPtrFun, typename Cons> struct member_id;
+template<typename Def, typename Rec, typename F> struct memfun;
+template<typename Class, typename Base, typename T> constexpr std::ptrdiff_t offset_of(T Base::*);
+template<typename MemPtrFun> struct member_access_fun;
 template<typename F> auto make_symbol(F f);
 template<std::size_t ...Is, typename F> auto make_symbol_impl(std::index_sequence<Is...>, F f);
 
 template<auto ...> struct symbol {};
 template<auto x> struct memptr { static constexpr decltype(x) value = x; };
 struct raw_value_tag {};
+template<typename T> struct idtype { using type = T; };
 
 // definitions
 
@@ -207,12 +210,8 @@ constexpr auto operator!=(record<Defs1...> const & rec1, record<Defs2...> const 
 // slice
 template<typename Def, typename Rec>
 struct slice: holder<Def, Rec> {
-    template<typename V, bool C = !Def::is_memfun, typename = std::enable_if_t<C>>
+    template<typename V>
     constexpr slice(V && v): holder<Def, Rec>{std::forward<V>(v)} {}
-    template<typename V, bool C = Def::is_memfun && std::is_standard_layout_v<member_raw_value_type<Def>>, typename = std::enable_if_t<C>, typename = void>
-    constexpr slice(V && v): holder<Def, Rec>{{std::forward<V>(v)}} {}
-    template<typename V, bool C = Def::is_memfun && !std::is_standard_layout_v<member_raw_value_type<Def>>, typename = std::enable_if_t<C>, typename = void, typename = void>
-    slice(V && v): holder<Def, Rec>{{std::forward<V>(v), static_cast<Rec *>(this)}} {}
     constexpr auto        & operator[](member_symbol<Def>)        & { return member_access<Def>{}(*this); }
     constexpr auto const  & operator[](member_symbol<Def>) const  & { return member_access<Def>{}(*this); }
     constexpr auto       && operator[](member_symbol<Def>)       && { return member_access<Def>{}(std::move(*this)); }
@@ -220,52 +219,64 @@ struct slice: holder<Def, Rec> {
 };
 
 // memfun
-template<typename Rec, typename Slice, typename F>
+template<typename Def, typename Rec, typename F>
 struct memfun {
-    template<typename ...Args>
-    constexpr memfun(Args && ...args): data{std::forward<Args>(args)...} {}
+    template<typename G>
+    constexpr memfun(G && f): data{std::forward<G>(f)} {}
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args)       {
-        return std::get<0>(data)(self(), std::forward<Args>(args)...);
+        return data(self(), std::forward<Args>(args)...);
     }
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args) const {
-        return std::get<0>(data)(self(), std::forward<Args>(args)...);
+        return data(self(), std::forward<Args>(args)...);
     }
-    template<typename Access> friend struct member_access_fun;
+    template<typename> friend struct member_access_fun;
 private:
-    static constexpr bool stdlayout = std::is_standard_layout_v<F>;
-    std::conditional_t<stdlayout, std::tuple<F>, std::tuple<F, Rec *>> data;
+    F data;
     Rec & self() {
-        if constexpr (stdlayout) return *static_cast<Rec *>(reinterpret_cast<Slice *>(this));
-        else return *std::get<1>(data);
+        return *reinterpret_cast<Rec *>(reinterpret_cast<char *>(this) - member_offset<Def, Rec>);
     }
-    Rec const & self() const {
-        if constexpr (stdlayout) return *static_cast<Rec const *>(reinterpret_cast<Slice const *>(this));
-        else return *std::get<1>(data);
-    }
+    Rec const & self() const { return const_cast<memfun *>(this)->self(); }
 };
 
+// offset_of
+template<typename Class, typename Base, typename T>
+constexpr std::ptrdiff_t offset_of(T Base::* mp) {
+    union aligner {
+        char addr_range[sizeof(Class)];
+        Class obj;
+        constexpr aligner(): addr_range{} {};
+    };
+    aligner a;
+    std::size_t i = 0;
+    void * target = static_cast<void *>(&(a.obj.*mp));
+    for (char * addr = a.addr_range; static_cast<void *>(addr) != target; ++addr, ++i) ;
+    return i;
+}
+
 // member_definition
-template<typename Symbol, typename Access, typename Cons, typename Value, bool Fun>
+template<typename Symbol, typename MemPtrFun, typename Cons, typename Value, bool Fun>
 struct member_definition: Symbol {
     using symbol = Symbol;
     using raw_value_type = Value;
-    using member_access = Access;
+    using member_access = member_access_fun<MemPtrFun>;
     static constexpr bool is_memfun = Fun;
     template<typename Rec>
     using holder = typename decltype(
-        std::declval<Cons>()(std::conditional<Fun, memfun<Rec, slice<member_definition, Rec>, Value>, Value>{})
+        std::declval<Cons>()(std::conditional<Fun, memfun<member_definition, Rec, Value>, Value>{})
     )::type;
+    template<typename Rec>
+    static constexpr std::ptrdiff_t member_offset = here::offset_of<Rec>(decltype(std::declval<MemPtrFun>()(idtype<Rec>{}))::value);
 };
 
 // member_id
-template<typename Symbol, typename Access, typename Cons>
+template<typename Symbol, typename MemPtrFun, typename Cons>
 struct member_id: Symbol {
     template<typename ...Args> constexpr member_id(Args && ...) {}
     template<typename Value, bool Fun = false>
     constexpr auto operator=(Value && x) && {
-        using def = member_definition<Symbol, Access, Cons, std::decay_t<Value>, Fun>;
+        using def = member_definition<Symbol, MemPtrFun, Cons, std::decay_t<Value>, Fun>;
         return here::make_record_initializer<def>(std::forward<Value>(x));
     }
     constexpr member_id() = default;
@@ -286,23 +297,23 @@ private:
 public:
     fun_helper fun;
 };
-template<typename Symbol, typename Access, typename Cons>
-member_id(Symbol sym, Access, Cons) -> member_id<decltype(here::make_symbol(sym)), member_access_fun<Access>, Cons>;
+template<typename Symbol, typename MemPtrFun, typename Cons>
+member_id(Symbol sym, MemPtrFun, Cons) -> member_id<decltype(here::make_symbol(sym)), MemPtrFun, Cons>;
 
 // member_access_fun
 template<typename ...Args> std::true_type is_memfun_value(memfun<Args...> const &);
 template<typename T> std::false_type is_memfun_value(T const &);
-template<typename Access>
+template<typename MemPtrFun>
 struct member_access_fun {
     template<typename Rec>
     constexpr auto && operator()(Rec && r) const {
-        return std::forward<Rec>(r).*decltype(std::declval<Access>()(r))::value;
+        return std::forward<Rec>(r).*decltype(std::declval<MemPtrFun>()(idtype<std::decay_t<decltype(r)>>{}))::value;
     }
     template<typename Rec>
     constexpr auto && operator()(Rec && r, raw_value_tag) const {
         auto && v = operator()(std::forward<Rec>(r));
         if constexpr (decltype(here::is_memfun_value(v)){}) {
-            return std::get<0>(std::forward<decltype(v)>(v).data);
+            return std::forward<decltype(v)>(v).data;
         } else {
             return std::forward<decltype(v)>(v);
         }
