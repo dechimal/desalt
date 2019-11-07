@@ -28,46 +28,6 @@ namespace desalt {
 namespace detail::record {
 namespace here = record;
 
-template<typename F>
-constexpr auto fix(F f) {
-    return [f] (auto && ...args) {
-        return f(fix(f), std::forward<decltype(args)>(args)...);
-    };
-}
-
-struct skip_one {};
-struct skip_all {};
-
-template<typename F, typename ...Args> auto valid_expr(F f, Args && ...args) -> decltype((void)f(std::forward<Args>(args)...), std::true_type{}) { return {}; }
-std::false_type valid_expr(...) { return {}; }
-
-template<typename ...Fs>
-constexpr decltype(auto) ftie(Fs && ...fs) {
-    auto impl = [] (auto & fs, auto && ...args) -> decltype(auto) {
-        return std::apply(here::fix([&] (auto && ftie_impl, auto && g, auto && ...gs) -> decltype(auto) {
-            if constexpr (!sizeof...(gs) || decltype(here::valid_expr(g, std::forward<decltype(args)>(args)...)){}) {
-                using result_type = decltype(g(std::forward<decltype(args)>(args)...));
-                if constexpr (std::is_same_v<result_type, skip_one>) {
-                    return ftie_impl(std::forward<decltype(gs)>(gs)...);
-                } else if constexpr (std::is_same_v<result_type, skip_all>) {
-                    return skip_all{};
-                } else {
-                    return g(std::forward<decltype(args)>(args)...);
-                }
-            } else {
-                return ftie_impl(std::forward<decltype(gs)>(gs)...);
-            }
-        }), std::move(fs));
-    };
-    auto gs = std::tuple<Fs...>{std::forward<Fs>(fs)...};
-    return [impl, gs=std::move(gs)] (auto && ...args) -> std::enable_if_t<
-        !std::is_same_v<decltype(impl(gs, std::forward<decltype(args)>(args)...)), skip_all>,
-        decltype(impl(gs, std::forward<decltype(args)>(args)...))
-    > {
-        return impl(gs, std::forward<decltype(args)>(args)...);
-    };
-}
-
 template<typename ...Defs> struct record;
 
 template<typename Symbol, typename MemPtrFun, typename Cons, typename Value, bool Fun> struct member_definition;
@@ -79,19 +39,19 @@ template<typename Def, typename Rec> static constexpr std::ptrdiff_t member_offs
 
 template<typename T> struct idtype { using type = T; };
 template<typename ...Defs> constexpr std::tuple<member_symbol<Defs>...> record_members(record<Defs...> const &) { return {}; }
-template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs(record<Defs...> const &) { return {}; }
-template<typename ...Defs> constexpr auto record_member_var_defs_impl(idtype<record<Defs...>>);
+template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs_impl(idtype<record<Defs...>>);
+template<typename Rec> using record_member_defs = decltype(here::record_member_defs_impl(idtype<Rec>{}));
+template<typename Rec> constexpr auto record_member_var_defs_impl(idtype<Rec>);
 template<typename Rec> using record_member_var_defs = typename decltype(here::record_member_var_defs_impl(idtype<std::decay_t<Rec>>{}))::type;
 template<typename Def1, typename ...Defs, typename Def2> constexpr auto record_member_def_impl(idtype<record<Def1, Defs...>>, Def2);
 template<typename Rec, typename Def> using record_member_def = decltype(here::record_member_def_impl(idtype<std::decay_t<Rec>>{}, Def{}));
 
-template<typename ...Defs> void valid_if_record(record<Defs...> const &);
-template<typename ...Defs> std::true_type is_record(record<Defs...> const &);
-template<typename T> std::false_type is_record(T const &);
-
 template<typename Rec1, typename Rec2> constexpr bool swappable_records();
 template<typename ...Defs1, typename ...Defs2, typename = std::enable_if_t<here::swappable_records<record<Defs1...>, record<Defs2...>>()>> constexpr void swap(record<Defs1...> &, record<Defs2...> &);
 template<typename Rec1, typename Rec2, typename ...Defs> constexpr void swap_impl(Rec1 & a, Rec2 & b, idtype<std::tuple<Defs...>>);
+
+template<typename ...Recs> constexpr auto combine(Recs && ...rs);
+template<typename Rec> struct combine_helper;
 
 template<typename Def, typename Rec> struct slice;
 template<typename Def, typename Value> struct record_initializer { Value value; };
@@ -111,44 +71,21 @@ struct raw_value_tag {};
 // definitions
 
 // filter
-constexpr auto filter = [] (auto && p, auto && t) {
-    return std::apply(here::fix([&] (auto && filter_impl, auto && ...results) {
-        return here::ftie([&] {
-            return std::tuple{std::forward<decltype(results)>(results)...};
-        }, [&] (auto && x, auto && ...xs) {
-            if constexpr (decltype(p(std::forward<decltype(x)>(x))){}) {
-                return filter_impl(std::forward<decltype(results)>(results)..., std::forward<decltype(x)>(x))(std::forward<decltype(xs)>(xs)...);
-            } else {
-                return filter_impl(std::forward<decltype(results)>(results)...)(std::forward<decltype(xs)>(xs)...);
-            }
-        });
-    })(), std::forward<decltype(t)>(t));
+template<typename Pred, typename T>
+struct filter_helper {
+    template<typename ...Ts>
+    constexpr auto operator+(idtype<std::tuple<Ts...>>) const {
+        if constexpr (decltype(std::declval<Pred>()(idtype<T>{}))::value) {
+            return idtype<std::tuple<T, Ts...>>{};
+        } else {
+            return idtype<std::tuple<Ts...>>{};
+        }
+    }
 };
-
-// merge
-constexpr auto merge = here::ftie([] (auto && ...rs) -> std::enable_if_t<!(decltype(here::is_record(rs)){} && ...)> {
-    return skip_all{};
-}, [] (auto && ...rs) {
-    return here::fix([] (auto && merge_impl, auto && ...inits) {
-        return here::ftie([&] {
-            return record { std::forward<decltype(inits)>(inits)... };
-        }, [&] (auto && rec, auto && ...recs) {
-            auto filtered = std::apply([] (auto ...defs) {
-                return here::filter([] (auto def) {
-                    constexpr bool b = (std::is_same_v<member_symbol<decltype(def)>, member_symbol<decltype(defs)>> || ...);
-                    return std::bool_constant<!b>{};
-                }, decltype(here::record_member_defs(rec)){});
-            }, std::tuple_cat(decltype(here::record_member_defs(recs)){}...));
-            return std::apply([&] (auto ...defs) {
-                return merge_impl(
-                    std::forward<decltype(inits)>(inits)...,
-                    here::make_record_initializer<decltype(defs)>(
-                        member_access<decltype(defs)>{}(std::forward<decltype(rec)>(rec), raw_value_tag{})
-                    )...)(std::forward<decltype(recs)>(recs)...);
-            }, decltype(filtered){});
-        });
-    })()(std::forward<decltype(rs)>(rs)...);
-});
+template<typename Pred, typename ...Ts>
+constexpr auto filter(Pred p, idtype<std::tuple<Ts...>>) {
+    return (filter_helper<Pred, Ts>{} + ... + idtype<std::tuple<>>{});
+}
 
 // record
 template<typename ...Defs>
@@ -214,6 +151,36 @@ constexpr auto operator!=(record<Defs1...> const & rec1, record<Defs2...> const 
     return !(rec1 == rec2);
 }
 
+// combine
+template<typename ...Recs>
+constexpr auto combine(Recs && ...rs) {
+    return std::apply([] (auto && ...inits) {
+        return record {
+            std::apply([] (auto def, auto && rec) {
+                using def_type = decltype(def);
+                auto access = member_access<def_type>{};
+                return here::make_record_initializer<def_type>(
+                    access(std::forward<decltype(rec)>(rec), raw_value_tag{})
+                );
+            }, std::forward<decltype(inits)>(inits))...
+        };
+    }, (combine_helper<Recs &&>{std::forward<Recs>(rs)} + ... + std::tuple{}));
+}
+template<typename Rec>
+struct combine_helper {
+    template<typename ...Defs, typename ...Recs>
+    constexpr auto operator+(std::tuple<std::tuple<Defs, Recs>...> && result) const {
+        auto defs = here::filter([] (auto def) {
+            return std::bool_constant<!(std::is_same_v<member_symbol<typename decltype(def)::type>, member_symbol<Defs>> || ...)>{};
+        }, idtype<record_member_defs<std::decay_t<decltype(rec)>>>{});
+        auto inits = std::apply([&rec=rec] (auto ...defs) {
+            return std::make_tuple(std::tuple<decltype(defs), Rec>(defs, static_cast<Rec>(rec))...);
+        }, typename decltype(defs)::type{});
+        return std::tuple_cat(std::move(inits), std::move(result));
+    }
+    Rec rec;
+};
+
 // slice
 template<typename Def, typename Rec>
 struct slice: holder<Def, Rec> {
@@ -256,10 +223,10 @@ constexpr std::ptrdiff_t offset_of(T Base::* mp) {
         constexpr aligner(): addr_range{} {};
     };
     aligner a;
-    std::size_t i = 0;
     void * target = static_cast<void *>(&(a.obj.*mp));
-    for (char * addr = a.addr_range; static_cast<void *>(addr) != target; ++addr, ++i) ;
-    return i;
+    char * addr = a.addr_range;
+    while (addr != target) ++addr;
+    return addr - a.addr_range;
 }
 
 // member_definition
@@ -344,20 +311,11 @@ constexpr auto make_record_initializer(Value && value) {
 }
 
 // record_member_var_defs_impl
-template<typename Def>
-struct record_member_var_defs_helper {
-    template<typename ...Defs>
-    constexpr auto operator+(idtype<std::tuple<Defs...>>) {
-        if constexpr (Def::is_memfun) {
-            return idtype<std::tuple<Defs...>>{};
-        } else {
-            return idtype<std::tuple<Def, Defs...>>{};
-        }
-    }
-};
-template<typename ...Defs>
-constexpr auto record_member_var_defs_impl(idtype<record<Defs...>>) {
-    return (record_member_var_defs_helper<Defs>{} + ... + idtype<std::tuple<>>{});
+template<typename Rec>
+constexpr auto record_member_var_defs_impl(idtype<Rec> x) {
+    return here::filter([] (auto def) {
+        return std::bool_constant<!decltype(def)::type::is_memfun>{};
+    }, idtype<record_member_defs<Rec>>{});
 }
 
 // record_member_def_impl
@@ -375,7 +333,7 @@ constexpr auto record_member_def_impl(idtype<record<Def1, Defs...>>, Def2) {
 } // namespace detail::record {
 
 namespace record {
-using detail::record::record, detail::record::merge, detail::record::swap;
+using detail::record::record, detail::record::combine, detail::record::swap;
 using detail::record::operator==, detail::record::operator!=;
 }
 
