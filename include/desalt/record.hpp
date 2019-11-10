@@ -47,12 +47,14 @@ template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs_impl
 template<typename Rec> using record_member_defs = decltype(here::record_member_defs_impl(idtype<std::decay_t<Rec>>{}));
 template<typename Rec> constexpr auto record_member_var_defs_impl(idtype<Rec>);
 template<typename Rec> using record_member_var_defs = decltype(here::record_member_var_defs_impl(idtype<std::decay_t<Rec>>{}));
-template<typename Def1, typename ...Defs, typename Def2> constexpr auto record_member_def_impl(idtype<record<Def1, Defs...>>, Def2);
-template<typename Rec, typename Def> using record_member_def = decltype(here::record_member_def_impl(idtype<std::decay_t<Rec>>{}, Def{}));
+template<typename Def1, typename ...Defs, typename Def2> constexpr auto record_member_def_impl(idtype<std::tuple<Def1, Defs...>>, Def2);
+template<typename Rec, typename Def> using record_member_def = decltype(here::record_member_def_impl(idtype<record_member_defs<Rec>>{}, Def{}));
 
-template<typename Rec1, typename Rec2> constexpr bool swappable_records();
+template<typename ...Defs1, typename Rec2> constexpr bool record_swappable_impl(idtype<std::tuple<Defs1...>>, idtype<Rec2>);
+template<typename Rec1, typename Rec2> static constexpr bool record_swappable =
+    here::record_swappable_impl(idtype<record_member_defs<std::decay_t<Rec1>>>{}, idtype<std::decay_t<Rec2>>{});
 template<typename ...Defs1, typename ...Defs2,
-    bool C = here::is_swappable_with<record<Defs1...>, record<Defs2...>>(),
+    bool C = here::record_swappable<record<Defs1...>, record<Defs2...>>,
     typename = std::enable_if_t<C>
 > constexpr void swap(record<Defs1...> &, record<Defs2...> &);
 template<typename Rec1, typename Rec2, typename ...Defs> constexpr void swap_impl(Rec1 & a, Rec2 & b, idtype<std::tuple<Defs...>>);
@@ -96,7 +98,7 @@ struct record: slice<Defs, record<Defs...>>... {
         return *this;
     }
 
-    template<typename ...Defs2, typename = std::enable_if_t<here::swappable_records<record, record<Defs2...>>()>>
+    template<typename ...Defs2, typename = std::enable_if_t<here::record_swappable<record, record<Defs2...>>()>>
     constexpr void swap(record<Defs2...> & rec2) {
         here::swap_impl(*this, rec2, idtype<record_member_var_defs<record>>{});
     }
@@ -104,7 +106,7 @@ struct record: slice<Defs, record<Defs...>>... {
 template<typename ...Defs, typename ...Values> record(record_initializer<Defs, Values>...) -> record<Defs...>;
 
 // swap
-template<typename ...Defs1, typename ...Defs2, typename>
+template<typename ...Defs1, typename ...Defs2, bool, typename>
 constexpr void swap(record<Defs1...> & a, record<Defs2...> & b) {
     here::swap_impl(a, b, idtype<record_member_var_defs<record<Defs1...>>>{});
 }
@@ -113,16 +115,14 @@ constexpr void swap_impl(Rec1 & a, Rec2 & b, idtype<std::tuple<Defs...>>) {
     using std::swap;
     ((void)swap(a[Defs{}], b[Defs{}]), ...);
 }
-template<typename Rec1, typename Rec2>
-constexpr bool swappable_records() {
-    return std::apply([] (auto ...defs) {
-        bool a = std::tuple_size_v<record_member_var_defs<Rec2>> == sizeof...(defs);
-        bool b = (std::is_swappable_with_v<
-                member_raw_value_type<decltype(defs)> &,
-                member_raw_value_type<record_member_def<Rec2, decltype(defs)>> &
-            > && ...);
-        return a && b;
-    }, record_member_var_defs<Rec1>{});
+template<typename ...Defs, typename Rec2>
+constexpr bool record_swappable_impl(idtype<std::tuple<Defs...>>, idtype<Rec2>) {
+    constexpr std::size_t nmem_var_rec2 = std::tuple_size_v<record_member_var_defs<Rec2>>;
+    if (nmem_var_rec2 != sizeof...(Defs)) return false;
+    return (std::is_swappable_with_v<
+        member_raw_value_type<Defs> &,
+        member_raw_value_type<record_member_def<Rec2, Defs>> &
+    > && ...);
 }
 
 // ==
@@ -189,18 +189,18 @@ struct slice: holder<Def, Rec> {
 template<typename Def, typename Rec, typename F>
 struct memfun {
     template<typename G>
-    constexpr memfun(G && f): data{std::forward<G>(f)} {}
+    constexpr memfun(G && f): f{std::forward<G>(f)} {}
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args)       {
-        return data(self(), std::forward<Args>(args)...);
+        return f(self(), std::forward<Args>(args)...);
     }
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args) const {
-        return data(self(), std::forward<Args>(args)...);
+        return f(self(), std::forward<Args>(args)...);
     }
     template<typename> friend struct member_access_fun;
 private:
-    F data;
+    F f;
     Rec & self() {
         return *reinterpret_cast<Rec *>(reinterpret_cast<char *>(this) - member_offset<Def, Rec>);
     }
@@ -280,7 +280,7 @@ struct member_access_fun {
     constexpr auto && operator()(Rec && r, raw_value_tag) const {
         auto && v = operator()(std::forward<Rec>(r));
         if constexpr (decltype(here::is_memfun_value(v)){}) {
-            return std::forward<decltype(v)>(v).data;
+            return std::forward<decltype(v)>(v).f;
         } else {
             return std::forward<decltype(v)>(v);
         }
@@ -315,11 +315,11 @@ constexpr auto record_member_var_defs_impl(idtype<Rec> x) {
 
 // record_member_def_impl
 template<typename Def1, typename ...Defs, typename Def2>
-constexpr auto record_member_def_impl(idtype<record<Def1, Defs...>>, Def2) {
+constexpr auto record_member_def_impl(idtype<std::tuple<Def1, Defs...>>, Def2) {
     if constexpr (std::is_same_v<member_symbol<Def1>, member_symbol<Def2>>) {
         return Def1{};
     } else if constexpr (sizeof...(Defs)) {
-        return here::record_member_def_impl(idtype<record<Defs...>>{}, Def2{});
+        return here::record_member_def_impl(idtype<std::tuple<Defs...>>{}, Def2{});
     } else {
         return;
     }
