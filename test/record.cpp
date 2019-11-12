@@ -32,8 +32,8 @@ int main() {
         assert(r.s.z == 3);
 
         // subscription by name
-        assert(r[DESALT_MEMBER(n)] == 42);
-        assert(r[DESALT_MEMBER(vec)] == (std::vector{1,2,3}));
+        assert(get(DESALT_MEMBER(n), r) == 42);
+        assert(get(DESALT_MEMBER(vec), r) == (std::vector{1,2,3}));
 
         // assignment
         r = record {
@@ -113,7 +113,7 @@ int main() {
         };
 
         assert(r.f(3) == 45);          // any call of member function is not constexpr
-        assert(r[DESALT_MEMBER(f)](3) == 45); // also access by symbol
+        assert(get(DESALT_MEMBER(f), r)(3) == 45); // also access by symbol
         static_assert(r.x == 42);      // but value access is constexpr
         static_assert(combine(r, record { DESALT_MEMBER(y) = 5 }).x == 42);
     }
