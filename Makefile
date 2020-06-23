@@ -12,15 +12,8 @@ ifeq ($(findstring clang,$(CXX)),clang)
   CXXFLAGS += -Wno-unused-local-typedef
 endif
 
-ifeq ($(CXXSTD),17)
-  CXXFLAGS += -std=c++1z
-else
-ifeq ($(CXXSTD),1z)
-  CXXFLAGS += -std=c++1z
-else
-  CXXFLAGS += -std=c++14
-endif
-endif
+CXXSTD ?= 14
+CXXFLAGS += -std=c++$(CXXSTD)
 
 ifneq ($(BOOST_INCLUDE),)
   CPPFLAGS += -I$(BOOST_INCLUDE)
