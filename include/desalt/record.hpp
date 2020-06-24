@@ -31,23 +31,9 @@ namespace desalt {
 namespace detail::record {
 namespace here = record;
 
-template<typename ...Defs> struct record;
 template<typename Rec, typename Def, typename F> struct memfun;
 template<auto MP> struct slice_definition;
-
-template<typename Def> using member_symbol = typename Def::symbol_type;
-template<typename Def> using member_raw_value_type = typename Def::raw_value_type;
 template<typename T> struct idtype { using type = T; };
-template<typename ...Defs> constexpr std::tuple<member_symbol<Defs>...> record_members(record<Defs...> const &) { return {}; }
-template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs_impl(idtype<record<Defs...>>);
-template<typename Rec> using record_member_defs = decltype(here::record_member_defs_impl(idtype<std::decay_t<Rec>>{}));
-template<typename Rec> constexpr auto record_member_var_defs_impl(idtype<Rec>);
-template<typename Rec> using record_member_var_defs = decltype(here::record_member_var_defs_impl(idtype<std::decay_t<Rec>>{}));
-template<typename Def1, typename ...Defs, typename Def2> constexpr auto record_member_def_impl(idtype<std::tuple<Def1, Defs...>>, Def2);
-template<typename Rec, typename Sym> using record_member_def = decltype(here::record_member_def_impl(idtype<record_member_defs<Rec>>{}, Sym{}));
-template<typename Rec> struct record_memptr_impl;
-template<typename ...Defs> struct record_memptr_impl<record<Defs...>>: Defs... { using Defs::memptr...; };
-template<typename Rec, typename Symbol> constexpr auto record_memptr = record_memptr_impl<Rec>::template memptr<Rec>(Symbol{});
 
 #if DESALT_CXX20
 template<auto> struct symbol {};
@@ -76,6 +62,22 @@ using record_slice_def = decltype(
 );
 template<typename Symbol, typename Cons> struct member_id;
 #endif
+
+template<typename ...Defs> struct record;
+
+template<typename Def> using member_symbol = typename Def::symbol_type;
+template<typename Def> using member_raw_value_type = typename Def::raw_value_type;
+
+template<typename ...Defs> constexpr std::tuple<Defs...> record_member_defs_impl(idtype<record<Defs...>>);
+template<typename Rec> using record_member_defs = decltype(here::record_member_defs_impl(idtype<std::decay_t<Rec>>{}));
+
+template<typename Rec> constexpr auto record_member_var_defs_impl(idtype<Rec>);
+template<typename Rec> using record_member_var_defs = decltype(here::record_member_var_defs_impl(idtype<std::decay_t<Rec>>{}));
+
+template<typename Rec> struct record_member_def_at_helper;
+template<typename Rec, typename Sym> using record_member_def_at = typename decltype(record_member_def_at_helper<Rec>::def_at(Sym{}))::type;
+template<typename Rec, typename Sym> using record_slice_def_at = record_slice_def<Rec, record_member_def_at<Rec, Sym>>;
+
 template<typename Rec, typename Def> using record_slice = typename record_slice_def<Rec, Def>::slice_type;
 
 template<typename ...Defs1, typename Rec2> constexpr bool record_swappable_impl(idtype<std::tuple<Defs1...>>, idtype<Rec2>);
@@ -90,9 +92,7 @@ template<typename Rec1, typename Rec2, typename ...Defs> constexpr void swap_imp
 template<typename ...Recs> constexpr auto combine(Recs && ...rs);
 template<typename Rec> struct combine_helper;
 
-template<typename Class, typename T> constexpr std::ptrdiff_t offset_of(T Class::*);
-
-template<typename Def, typename Value> struct record_initializer { Value && value; };
+template<typename Def, typename Value> struct record_initializer { Value value; };
 template<typename Def, typename Value> constexpr auto make_record_initializer(Value && value);
 
 template<typename Pred, typename ...Ts> struct filter_impl;
@@ -118,14 +118,14 @@ struct record: record_slice<record<Defs...>, Defs>... {
         return *this;
     }
 
-    template<typename Def, typename = std::enable_if_t<!std::is_same_v<record_member_def<record, Def>, void>>>
-    constexpr auto        & operator[](Def)            & { return this->*record_memptr<record, Def>; }
-    template<typename Def, typename = std::enable_if_t<!std::is_same_v<record_member_def<record, Def>, void>>>
-    constexpr auto const  & operator[](Def def) const  & { return const_cast<record &>(*this)[def]; }
-    template<typename Def, typename = std::enable_if_t<!std::is_same_v<record_member_def<record, Def>, void>>>
-    constexpr auto       && operator[](Def def)       && { return std::move((*this)[def]); }
-    template<typename Def, typename = std::enable_if_t<!std::is_same_v<record_member_def<record, Def>, void>>>
-    constexpr auto const && operator[](Def def) const && { return std::move((*this)[def]); }
+    template<typename Sym, auto MP = record_slice_def_at<record, Sym>::memptr>
+    constexpr auto        & operator[](Sym)            & { return this->*MP; }
+    template<typename Sym, auto MP = record_slice_def_at<record, Sym>::memptr>
+    constexpr auto const  & operator[](Sym sym) const  & { return this->*MP; }
+    template<typename Sym, auto MP = record_slice_def_at<record, Sym>::memptr>
+    constexpr auto       && operator[](Sym sym)       && { return std::move(this->*MP); }
+    template<typename Sym, auto MP = record_slice_def_at<record, Sym>::memptr>
+    constexpr auto const && operator[](Sym sym) const && { return std::move(this->*MP); }
 
     template<typename ...Defs2, typename = std::enable_if_t<here::record_swappable<record, record<Defs2...>>()>>
     constexpr void swap(record<Defs2...> & rec2) {
@@ -134,10 +134,9 @@ struct record: record_slice<record<Defs...>, Defs>... {
 };
 template<typename ...Defs, typename ...Values> record(record_initializer<Defs, Values>...) -> record<Defs...>;
 
-template<typename Sym, typename Rec, typename = std::enable_if_t<!std::is_same_v<record_member_def<Rec, Sym>, void>>>
+template<typename Sym, typename Rec, auto MP = record_slice_def_at<std::decay_t<Rec>, Sym>::memptr>
 constexpr auto && get(Sym sym, Rec && rec) {
-    auto mp = record_memptr<std::decay_t<Rec>, Sym>;
-    return std::forward<Rec>(rec).*mp;
+    return std::forward<Rec>(rec).*MP;
 }
 
 // swap
@@ -156,7 +155,7 @@ constexpr bool record_swappable_impl(idtype<std::tuple<Defs...>>, idtype<Rec2>) 
     if (nmem_var_rec2 != sizeof...(Defs)) return false;
     return (std::is_swappable_with_v<
         member_raw_value_type<Defs> &,
-        member_raw_value_type<record_member_def<Rec2, Defs>> &
+        member_raw_value_type<record_member_def_at<Rec2, Defs>> &
     > && ...);
 }
 
@@ -182,15 +181,9 @@ constexpr auto combine(Recs && ...rs) {
     return std::apply([] (auto && ...inits) {
         auto make_init = [] (auto def, auto && rec) {
             using def_type = decltype(def);
-            if constexpr (def_type::is_memfun) {
-                return here::make_record_initializer<def_type>(
-                    std::forward<decltype(rec)>(rec)[def].f
-                );
-            } else {
-                return here::make_record_initializer<def_type>(
-                    std::forward<decltype(rec)>(rec)[def]
-                );
-            }
+            return here::make_record_initializer<def_type>(
+                std::forward<decltype(rec)>(rec)[def]
+            );
         };
         return record {
             std::apply(make_init, std::forward<decltype(inits)>(inits))...
@@ -216,40 +209,25 @@ struct combine_helper {
 
 // memfun
 template<typename Rec, typename Def, typename F>
-struct memfun {
+struct memfun: private F {
     template<typename G>
-    constexpr memfun(G && f): f{std::forward<G>(f)} {}
+    constexpr memfun(G && f): F{std::forward<G>(f)} {}
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args)       {
-        return f(self(), std::forward<Args>(args)...);
+        return F::operator()(self(), std::forward<Args>(args)...);
     }
     template<typename ...Args>
     decltype(auto) operator()(Args && ...args) const {
-        return f(self(), std::forward<Args>(args)...);
+        return F::operator()(self(), std::forward<Args>(args)...);
     }
-    template<typename ...Recs> friend constexpr auto combine(Recs && ...);
+    template<typename, typename, typename> friend struct memfun;
 private:
-    F f;
     Rec & self() {
-        return *reinterpret_cast<Rec *>(reinterpret_cast<char *>(this) - offset_of(record_memptr<Rec, Def>));
+        using slice_type = record_slice<Rec, Def>;
+        return *static_cast<Rec *>(reinterpret_cast<slice_type *>(this));
     }
     Rec const & self() const { return const_cast<memfun *>(this)->self(); }
 };
-
-// offset_of
-template<typename Class, typename T>
-constexpr std::ptrdiff_t offset_of(T Class::* mp) {
-    union aligner {
-        char addr_range[sizeof(Class)];
-        Class obj;
-        constexpr aligner(): addr_range{} {};
-    };
-    aligner a;
-    void * target = static_cast<void *>(&(a.obj.*mp));
-    char * addr = a.addr_range;
-    while (addr != target) ++addr;
-    return addr - a.addr_range;
-}
 
 // member_definition
 #if DESALT_CXX20
@@ -264,10 +242,14 @@ struct member_definition: Symbol {
     using symbol_type = Symbol;
     using raw_value_type = Value;
     static constexpr bool is_memfun = Fun;
-    template<typename Rec>
-    static constexpr auto memptr(symbol_type) {
-        return record_slice_def<Rec, member_definition>::memptr;
-    }
+    static constexpr idtype<member_definition> def_at(symbol_type) { return {}; }
+};
+
+// record_member_def_at_helper
+template<typename ...Defs>
+struct record_member_def_at_helper<record<Defs...>>: Defs... {
+    using Defs::def_at...;
+    static constexpr void def_at(...) {}
 };
 
 template<typename Slice, typename Member, Member Slice::* MP>
@@ -338,25 +320,12 @@ constexpr auto make_record_initializer(Value && value) {
 }
 
 // record_member_var_defs_impl
-template<typename Def> using record_member_var_defs_helper = std::bool_constant<Def::is_memfun>;
 template<typename Rec>
 constexpr auto record_member_var_defs_impl(idtype<Rec>) {
     auto pred = [] (auto def) {
         return std::bool_constant<!decltype(def)::type::is_memfun>{};
     };
     return filter<decltype(pred), record_member_defs<Rec>>{};
-}
-
-// record_member_def_impl
-template<typename Def1, typename ...Defs, typename Def2>
-constexpr auto record_member_def_impl(idtype<std::tuple<Def1, Defs...>>, Def2) {
-    if constexpr (std::is_same_v<member_symbol<Def1>, member_symbol<Def2>>) {
-        return Def1{};
-    } else if constexpr (sizeof...(Defs) > 0) {
-        return here::record_member_def_impl(idtype<std::tuple<Defs...>>{}, Def2{});
-    } else {
-        return;
-    }
 }
 
 // filter
