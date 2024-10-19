@@ -61,9 +61,9 @@ int main() {
     });
 
     ::static_match(sc::wrap<int>{})([&] (auto x, sc::wrap<decltype(std::declval<typename decltype(x)::type&>()++)>* = {}) {
-        static_assert((decltype(x){}, true), "static_control.cpp assert 5");
+        static_assert(((void)decltype(x){}, true), "static_control.cpp assert 5");
     }, [&] (auto x) {
-        static_assert((decltype(x){}, false), "this should be instanciated");
+        static_assert(((void)decltype(x){}, false), "this should not be instanciated");
     });
 
     // `static_for(x0, x1, ... xn, f)` is used to compile-time loop.
