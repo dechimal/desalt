@@ -45,8 +45,8 @@ struct argument_formatter {
 #define DESALT_FORMAT(f, ...) DESALT_FORMAT_I(f, __VA_ARGS__ BOOST_PP_COMMA_IF(BOOST_PP_EQUAL(BOOST_PP_VARIADIC_SIZE(__VA_ARGS__), 1)))
 #define DESALT_FORMAT_I(...) DESALT_FORMAT_II(__VA_ARGS__)
 #define DESALT_FORMAT_II(f, format_string, ...) \
-    [&] { struct type_encoded_format_string { BOOST_PP_REPEAT(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, format_string) }; \
-          return desalt::format::detail::make_formatter<type_encoded_format_string>::f(__VA_ARGS__); }()
+    ([&] { struct type_encoded_format_string { BOOST_PP_REPEAT(BOOST_PP_LIMIT_REPEAT, DESALT_FORMAT_M, format_string) }; \
+          return desalt::format::detail::make_formatter<type_encoded_format_string>::f(__VA_ARGS__); }())
 #define DESALT_FORMAT_M(z, i, format_string) \
     using BOOST_PP_CAT(t, i) = desalt::format::detail::char_type<(i < sizeof(format_string) / sizeof(*format_string) ? format_string[i] : '\0')>;
 

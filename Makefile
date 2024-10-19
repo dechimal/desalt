@@ -5,7 +5,7 @@ HEADERDIR := $(ROOT)/include
 -include config.mk
 
 CXXFLAGS += -Werror -Wall -Wextra -pedantic-errors -Wno-parentheses -Wno-unused-parameter $(CXX1YFLAGS)
-CPPFLAGS += -I$(HEADERDIR) -I.
+CPPFLAGS += -I$(HEADERDIR)
 
 CXXSTD ?= 14
 ifeq ($(findstring clang,$(CXX)),clang)

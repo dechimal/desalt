@@ -6,9 +6,10 @@ CXXFLAGS += -g -O0
 match.o record.o match.deps record.deps: CXXFLAGS += -std=c++1z
 record-2a.deps record-2a.o: CPPFLAGS += -DDESALT_CXX20
 record-2a.deps record-2a.o: CXXFLAGS += -std=c++2a
+format.deps format.o: CXXFLAGS += -std=c++2b
 
 test: $(targets)
-	for i in $^; do ./$$i; done
+	@set -ex; for i in $^; do ./$$i; done
 
 $(targets): % : %.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) $< -o $@
