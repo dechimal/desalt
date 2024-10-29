@@ -65,40 +65,52 @@ struct fmt_wrap {
     T const * ptr;
 };
 
+template<typename, typename> struct is_string_family: std::false_type {};
+template<typename T, typename CharT> struct is_string_family<T &, CharT>: is_string_family<T, CharT> {};
+template<typename CharT, typename Traits, typename A>
+struct is_string_family<std::basic_string<CharT, Traits, A>, CharT>: std::true_type {};
+template<typename CharT, typename Traits>
+struct is_string_family<std::basic_string_view<CharT, Traits>, CharT>: std::true_type {};
+template<typename CharT> struct is_string_family<CharT *, CharT>: std::true_type {};
+template<typename CharT> struct is_string_family<CharT const *, CharT>: std::true_type {};
+template<typename CharT, std::size_t N> struct is_string_family<CharT [N], CharT>: std::true_type {};
+template<typename CharT, std::size_t N> struct is_string_family<CharT const [N], CharT>: std::true_type {};
+
+template<typename T, typename CharT>
+concept string_family = is_string_family<T, CharT>::value;
+
 }
 
 namespace std {
 
 template<typename CharT, std::formattable<CharT> T>
-    requires (!std::ranges::input_range<T>)
+    requires (!std::ranges::input_range<T>) || qcttest::string_family<T, CharT>
 struct formatter<qcttest::fmt_wrap<T>, CharT>: std::formatter<T, CharT> {
-    auto format(qcttest::fmt_wrap<T> const & x, auto & fc) const {
+    template<typename FC>
+    typename FC::iterator format(qcttest::fmt_wrap<T> const & x, FC & fc) const {
         return std::formatter<T, CharT>::format(*x.ptr, fc);
     }
 };
 
-template<typename T>
-struct formatter<qcttest::fmt_wrap<T *>> {
-    constexpr auto parse(auto & pc) {
-        return pc.begin();
-    }
-    auto format(qcttest::fmt_wrap<T *> x, auto & fc) const {
-        char buf[21];
-        auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), reinterpret_cast<std::uintptr_t>(x.ptr), 16);
-        auto out = std::copy_n("*0x", 3, fc.out());
-        return std::copy(buf, ptr, out);
+template<typename T, typename CharT>
+struct formatter<qcttest::fmt_wrap<T *>, CharT>: std::formatter<void const *, CharT> {
+    template<typename FC>
+    typename FC::iterator format(qcttest::fmt_wrap<T *> const & x, FC & fc) const {
+        return std::formatter<void const *, CharT>::format(*x.ptr, fc);
     }
 };
 
 template<typename T, typename CharT>
-    requires requires (std::basic_ostream<CharT> & ost, T t) { ost << t; }
+    requires
+        requires (std::basic_ostream<CharT> & ost, T t) { ost << t; }
         && (!std::formattable<T, CharT>)
-        && (!(std::ranges::input_range<T> && std::formattable<std::ranges::range_value_t<T>, CharT>))
+        && (!std::ranges::input_range<T> || !std::formattable<std::ranges::range_value_t<T>, CharT>)
 struct formatter<qcttest::fmt_wrap<T>, CharT> {
     constexpr auto parse(auto & pc) {
         return pc.begin();
     }
-    auto format(qcttest::fmt_wrap<T> x, auto & fc) const {
+    template<typename FC>
+    typename FC::iterator format(qcttest::fmt_wrap<T> x, FC & fc) const {
         std::basic_stringstream<CharT> ss;
         ss << *x.ptr;
         auto s = std::move(ss.str());
@@ -109,7 +121,7 @@ struct formatter<qcttest::fmt_wrap<T>, CharT> {
 #if __GNUC__ <= 14
 
 template<std::ranges::input_range R, typename CharT>
-    requires std::formattable<std::ranges::range_value_t<R>, CharT>
+    requires std::formattable<std::ranges::range_value_t<R>, CharT> && (!qcttest::string_family<R, CharT>)
 struct formatter<qcttest::fmt_wrap<R>, CharT> {
     constexpr auto parse(auto & pc) {
         return pc.begin();

@@ -1,7 +1,8 @@
 
 .PHONY: test clean
 
-targets := require auto_fun parameter_pack newtype while struct static_control format match record record-2a
+targets := require auto_fun parameter_pack newtype while \
+	struct static_control format match record record-2a
 CXXFLAGS += -g -O0
 match.o record.o match.deps record.deps: CXXFLAGS += -std=c++1z
 record-2a.deps record-2a.o: CPPFLAGS += -DDESALT_CXX20
