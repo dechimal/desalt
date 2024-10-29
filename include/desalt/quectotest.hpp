@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
-#include <string>
 #include <print>
+#include <regex>
+#include <string>
+#include <vector>
 
 #if __GNUC__ <= 14
 #include <ranges>
@@ -50,6 +52,7 @@ namespace qcttest {
 
 struct test_link {
     void (*test)();
+    char const * name = nullptr;
     test_link * next = nullptr;
 };
 static test_link * first, * last;
@@ -143,7 +146,7 @@ struct formatter<qcttest::fmt_wrap<R>, CharT> {
             } \
         } \
         __attribute__((constructor)) static void _qct_init() { \
-            static qcttest::test_link link{_qct_run}; \
+            static qcttest::test_link link{_qct_run, test_case_name}; \
             if (!qcttest::first) qcttest::first = qcttest::last = &link; \
             else qcttest::last = qcttest::last->next = &link; \
         } \
@@ -151,10 +154,22 @@ struct formatter<qcttest::fmt_wrap<R>, CharT> {
     void class_name::_qct_test_case() \
     //
 
-int main() {
+int main(int argc, char * argv[]) {
+    std::vector<std::regex> pats;
+    if (argc < 2) {
+        pats.emplace_back(".*");
+    } else {
+        for (int i = 1; i < argc; ++i) pats.emplace_back(argv[i]);
+    }
+
     bool r = false;
     for (qcttest::test_link * link = qcttest::first; link; link = link->next) {
-        link->test();
+        for (auto & pat: pats) {
+            if (std::regex_match(link->name, pat)) {
+                link->test();
+                break;
+            }
+        }
         r |= qcttest::current_failure;
     }
     return r;
