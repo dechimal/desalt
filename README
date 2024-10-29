@@ -1,6 +1,6 @@
-Desalt - C++1z Utility Libraries
+Desalt - Funny C++ Utility Libraries
 
-Desalt ease using some metaprogramming idiom on C++1z.
+Desalt ease using some metaprogramming idiom on later C++1z.
 
 Library includes following features:
 
@@ -8,8 +8,9 @@ Library includes following features:
 - Require : Conditional overloaded function selection using SFINAE.
 - ParameterPack : Assist metaprogramming with parameter pack.
 - Newtype : Make a different type with existing type easily (inspired by Haskell's newtype),
-- StaticControl : sfinae-based compile-time branch and loop (static if, static for, etc...).
-- Format : A extensible printf.
+- StaticControl : SFINAE-based compile-time branch and loop (static if, static for, etc...).
+- Format : Extensible printf.
+- QuectoTest: Micro testing framework
 
 The samples are under test/ directory.
 
@@ -94,3 +95,34 @@ Format
 
   Header
   desalt/format.hpp
+
+QuectoTest
+
+  Header
+  desalt/quectotest.hpp
+
+  Synopsis
+  #define TEST(test_case_name, setup_classes...)
+  #define ASSERT(expr)
+  #define ASSERT_EQ(expr1, expr2, extra_msg_args...)
+  #define ASSERT_NE(expr1, expr2, extra_msg_args...)
+
+  Examples
+  #include <desalt/quectotest.hpp>
+
+  struct setup1 {
+    int x = 10;
+    int y = 20;
+  };
+
+  TEST("test1") {
+    ASSERT(true);
+  }
+
+  TEST("test1", setup1) {
+    ASSERT_EQ(x + 10, y);
+  }
+
+  Remarks
+  desalt/quectotest.hpp includes main function, do not define yourself it.
+  The built program may take testcase filter patterns (regular expression).
